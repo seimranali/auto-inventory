@@ -1,0 +1,36 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "auto-inventory",
+	"main": "src/index.js",
+	"compatibility_date": "2025-09-01",
+	"observability": {
+		"enabled": true
+	},
+	// React build served as static assets; /api/* runs the Worker first. Unknown paths fall back to index.html (SPA routing).
+	"assets": {
+		"directory": "../frontend/dist",
+		"binding": "ASSETS",
+		"not_found_handling": "single-page-application",
+		"run_worker_first": [
+			"/api/*"
+		]
+	},
+	// D1 database — create it with `npx wrangler d1 create auto-inventory` and paste the database_id here.
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "auto-inventory",
+			"database_id": "a4479f94-f663-47f1-a5f8-e7693629fa0f",
+			"migrations_dir": "migrations"
+		}
+	],
+	// R2 bucket for vehicle photos and auction sheets (optional: without it uploads are disabled)
+	"r2_buckets": [
+		{
+			"binding": "UPLOADS",
+			"bucket_name": "autoinventory"
+		}
+	],
+	"workers_dev": true,
+	"preview_urls": false
+}

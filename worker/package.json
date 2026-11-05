@@ -1,0 +1,19 @@
+{
+  "name": "auto-inventory-worker",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build:web": "npm --prefix ../frontend run build",
+    "dev": "npm run build:web && wrangler dev",
+    "db:migrate:local": "wrangler d1 migrations apply auto-inventory --local",
+    "db:migrate": "wrangler d1 migrations apply auto-inventory --remote",
+    "seed:demo": "node scripts/export-seed.mjs --demo && wrangler d1 execute auto-inventory --remote --file=seed/seed.sql",
+    "seed:demo:local": "node scripts/export-seed.mjs --demo && wrangler d1 execute auto-inventory --local --file=seed/seed.sql",
+    "deploy": "npm run build:web && wrangler deploy",
+    "release": "node scripts/build-release.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.42.0"
+  }
+}

@@ -1,0 +1,23 @@
+# Dependencies and build output
+node_modules/
+.next/
+dist/
+release/
+worker/release/
+
+# Local data, uploads and logs (never commit)
+backend/data/
+*.log
+logs/
+
+# Secrets
+.env.local
+.env
+.env.production
+
+# Local tool state
+.wrangler/
+
+# Business data exported from the database (customers, prices, profit)
+reports/
+presentation-screenshots/

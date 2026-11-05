@@ -1,0 +1,10 @@
+// Local test of release/worker.js exactly as uploaded via the dashboard (no assets binding).
+// npx wrangler dev -c wrangler.release-test.jsonc
+{
+  "name": "auto-inventory",
+  "main": "release/worker.js",
+  "compatibility_date": "2025-09-01",
+  "no_bundle": true,
+  "d1_databases": [{ "binding": "DB", "database_name": "auto-inventory", "database_id": "fe2460af-8951-4928-93af-9b529ba483ce", "migrations_dir": "migrations" }],
+  "r2_buckets": [{ "binding": "UPLOADS", "bucket_name": "auto-inventory-uploads" }]
+}
