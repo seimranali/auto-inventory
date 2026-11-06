@@ -16,11 +16,12 @@ import NavIcon from '../components/NavIcon';
 const TL_ICON = { auction: 'available', in: 'buy', out: 'sell' };
 const signed = n => <span className={n > 0 ? 'pos' : n < 0 ? 'neg' : ''}>{money(n)}</span>;
 
-/* Large photo + thumbnail strip; thumbnails carry cover / delete tools for editors */
+/* Photo grid: the cover large, the next photos beside it; "+N" opens the rest. Every tile opens the full-screen viewer.
+   Editors get set-cover / delete tools on each tile and an upload strip below. */
+const GRID_MAX = 5;
 function PhotoViewer({ images, title, canEdit, busy, onUpload, onCover, onDelete }) {
-  const [idx, setIdx] = useState(0);
   const open = useLightbox();
-  const cur = images[Math.min(idx, images.length - 1)];
+  const urls = images.map(i => fileUrl(i.file_name));
 
   if (!images.length) {
     return (
@@ -31,31 +32,30 @@ function PhotoViewer({ images, title, canEdit, busy, onUpload, onCover, onDelete
       </div>
     );
   }
+  const shown = images.slice(0, GRID_MAX);
+  const more = images.length - shown.length;
   return (
     <div className="vd-gallery">
-      <div className="vd-photo" style={{ '--vd-bg': `url("${fileUrl(cur.file_name)}")` }}>
-        <img src={fileUrl(cur.file_name)} alt={title}
-          onClick={() => open(images.map(i => fileUrl(i.file_name)), Math.min(idx, images.length - 1))} />
-        <span className="vd-photo-count">{Math.min(idx, images.length - 1) + 1} / {images.length}</span>
-        {images.length > 1 && <>
-          <button type="button" className="vd-nav prev" aria-label="Previous photo" onClick={() => setIdx(i => (i - 1 + images.length) % images.length)}>‹</button>
-          <button type="button" className="vd-nav next" aria-label="Next photo" onClick={() => setIdx(i => (i + 1) % images.length)}>›</button>
-        </>}
-      </div>
-      <div className="vd-thumbs">
-        {images.map((img, i) => (
-          <figure key={img.id} className={i === idx ? 'on' : ''}>
-            <img src={fileUrl(img.file_name)} alt="" onClick={() => setIdx(i)} />
+      <div className={`vd-grid n${shown.length}`}>
+        {shown.map((img, i) => (
+          <figure key={img.id}>
+            <img src={urls[i]} alt={i === 0 ? title : `${title} — photo ${i + 1}`} loading="lazy" onClick={() => open(urls, i)} />
             {i === 0 && <span className="cover-tag">Cover</span>}
+            {more > 0 && i === shown.length - 1 && (
+              <button type="button" className="vd-more" onClick={() => open(urls, i)}>+{more} more</button>
+            )}
             {canEdit && (
               <div className="vd-thumb-tools">
-                {i > 0 && <button type="button" title="Set as cover" onClick={() => { onCover(img); setIdx(0); }}>★</button>}
-                <button type="button" title="Delete photo" className="del" onClick={() => onDelete(img)}>×</button>
+                {i > 0 && <button type="button" title="Set as cover" aria-label="Set as cover" onClick={() => onCover(img)}>★</button>}
+                <button type="button" title="Delete photo" aria-label="Delete photo" className="del" onClick={() => onDelete(img)}>×</button>
               </div>
             )}
           </figure>
         ))}
-        {canEdit && <FileDropzone busy={busy} onFiles={onUpload} label="+ Add" />}
+      </div>
+      <div className="vd-gallery-foot">
+        <button type="button" className="link-btn" onClick={() => open(urls, 0)}>View all {images.length} photo{images.length === 1 ? '' : 's'}</button>
+        {canEdit && <FileDropzone busy={busy} onFiles={onUpload} label="+ Add photos" />}
       </div>
     </div>
   );

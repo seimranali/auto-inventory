@@ -1043,3 +1043,36 @@ textarea { min-height: 70px; resize: vertical; }
   .th-filter { width: 30px; height: 30px; }
   .row-actions { gap: 6px; }
 }
+
+/* ===================== Vehicle photo grid ===================== */
+/* Cover large on the left, up to four more beside it; every tile is cropped to fill (no bars) */
+.vd-grid { display: grid; gap: 6px; height: clamp(240px, 44vh, 420px); border-radius: 12px; overflow: hidden; }
+.vd-grid figure { position: relative; margin: 0; min-width: 0; min-height: 0; overflow: hidden; background: #e5e7eb; }
+.vd-grid img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in; transition: transform .25s ease, filter .2s; }
+.vd-grid figure:hover img { transform: scale(1.03); filter: brightness(.94); }
+.vd-grid .cover-tag { top: 8px; left: 8px; }
+.vd-grid .vd-thumb-tools { top: 8px; right: 8px; }
+.vd-grid.n1 { grid-template-columns: 1fr; }
+.vd-grid.n2 { grid-template-columns: 1fr 1fr; }
+.vd-grid.n3 { grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; }
+.vd-grid.n3 figure:first-child { grid-row: span 2; }
+.vd-grid.n4 { grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.vd-grid.n4 figure:first-child { grid-row: span 2; }
+.vd-grid.n4 figure:last-child { grid-column: span 2; }
+.vd-grid.n5 { grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.vd-grid.n5 figure:first-child { grid-row: span 2; }
+.vd-more { position: absolute; inset: 0; border: 0; border-radius: 0; background: rgba(15, 23, 42, .55); color: #fff;
+  font-size: 18px; font-weight: 700; cursor: zoom-in; }
+.vd-more:hover { background: rgba(15, 23, 42, .65); color: #fff; }
+.vd-gallery-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; }
+.vd-gallery-foot .dropzone { flex: 0 1 260px; padding: 8px 12px; font-size: 13px; font-weight: 600; }
+@media (max-width: 640px) {
+  /* Phones: cover full width on top, the rest two per row */
+  .vd-grid, .vd-grid.n2, .vd-grid.n3, .vd-grid.n4, .vd-grid.n5 { height: auto; grid-template-columns: 1fr 1fr; grid-template-rows: none; }
+  .vd-grid figure { aspect-ratio: 4 / 3; }
+  .vd-grid figure:first-child { grid-column: 1 / -1; grid-row: auto; aspect-ratio: 16 / 10; }
+  .vd-grid.n4 figure:last-child { grid-column: 1 / -1; aspect-ratio: 16 / 9; }
+  .vd-gallery-foot { flex-wrap: wrap; }
+  .vd-gallery-foot .dropzone { flex: 1 1 100%; }
+}
+@media print { .vd-grid { height: 240px; } .vd-gallery-foot, .vd-more, .vd-thumb-tools { display: none !important; } }
