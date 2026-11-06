@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, fileUrl } from '../api';
 import { useAsync } from '../hooks';
@@ -28,10 +29,39 @@ export function amountInWords(amount) {
   return parts.join(' ');
 }
 
+// A4 portrait with 10 mm margins leaves 190 x 277 mm for the invoice
+const MM = 96 / 25.4;
+const PAGE_W = 190 * MM, PAGE_H = 277 * MM;
+
+/**
+ * Printing always fits the invoice on one A4 page: just before printing, the compact print layout is
+ * applied at A4 width and measured; if it is still taller than the page, it is scaled down to fit.
+ */
+function useFitToA4() {
+  const ref = useRef();
+  useEffect(() => {
+    const before = () => {
+      const el = ref.current;
+      if (!el) return;
+      el.classList.add('inv-compact', 'inv-measure');
+      el.style.setProperty('--inv-fit', 1);
+      const h = el.scrollHeight;
+      el.classList.remove('inv-measure');
+      el.style.setProperty('--inv-fit', Math.min(1, (PAGE_H - 4) / h).toFixed(3));
+    };
+    const after = () => { ref.current?.classList.remove('inv-compact'); ref.current?.style.removeProperty('--inv-fit'); };
+    window.addEventListener('beforeprint', before);
+    window.addEventListener('afterprint', after);
+    return () => { window.removeEventListener('beforeprint', before); window.removeEventListener('afterprint', after); };
+  }, []);
+  return ref;
+}
+
 export default function InvoicePage() {
   const { id } = useParams();
   const { company, can } = useAuth();
   const { data: v, error, loading } = useAsync(() => api.vehicle(id), [id]);
+  const sheet = useFitToA4();
   const COMPANY = { ...company, terms: (company?.terms || '').split('\n').filter(Boolean) };
   const CURRENCY = getCurrency();
   const jpCo = company?.country === 'Japan';
@@ -40,6 +70,7 @@ export default function InvoicePage() {
   if (v.status !== 'Sold') return <ErrorBox error="This vehicle has not been sold yet." />;
 
   const balance = (v.sale_price || 0) - (v.amount_received || 0);
+  const cover = v.images?.[0];
   const exp = v.sale_type === 'Export';
   const specs = [
     ['Make', v.make], ['Model', v.model], ['Variant', v.variant], ['Year', v.year],
@@ -58,7 +89,7 @@ export default function InvoicePage() {
         </div>
       </div>
 
-      <article className="invoice">
+      <article className="invoice" ref={sheet}>
         <header className="inv-head">
           <div>
             {COMPANY.logo && <img className="inv-logo" src={fileUrl(COMPANY.logo)} alt="" />}
@@ -104,24 +135,27 @@ export default function InvoicePage() {
         </section>
 
         <div className="inv-label">Vehicle Particulars</div>
-        <table className="inv-specs">
-          <tbody>
-            {Array.from({ length: Math.ceil(specs.length / 2) }, (_, i) => (
-              <tr key={i}>
-                {[specs[i * 2], specs[i * 2 + 1]].flatMap((s, j) => [
-                  <th key={`k${j}`}>{s?.[0]}</th>, <td key={`v${j}`}>{s?.[1]}</td>,
-                ])}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className={`inv-vehicle ${cover ? 'has-photo' : ''}`}>
+          <table className="inv-specs">
+            <tbody>
+              {Array.from({ length: Math.ceil(specs.length / 2) }, (_, i) => (
+                <tr key={i}>
+                  {[specs[i * 2], specs[i * 2 + 1]].flatMap((s, j) => [
+                    <th key={`k${j}`}>{s?.[0]}</th>, <td key={`v${j}`}>{s?.[1]}</td>,
+                  ])}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {cover && <img className="inv-photo" src={fileUrl(cover.file_name)} alt={vehicleTitle(v)} />}
+        </div>
 
         <table className="inv-lines">
           <thead><tr><th>#</th><th>Description</th><th className="num">Amount ({CURRENCY})</th></tr></thead>
           <tbody>
             <tr>
               <td>1</td>
-              <td><strong>{vehicleTitle(v)}</strong><div className="inv-small">Chassis {v.chassis_no || '-'} · {v.color || ''}</div></td>
+              <td><strong>{vehicleTitle(v)}</strong><div className="inv-small">{[`Chassis ${v.chassis_no || '-'}`, v.color].filter(Boolean).join(' · ')}</div></td>
               <td className="num">{money(v.sale_price)}</td>
             </tr>
           </tbody>

@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { fileUrl } from '../api';
 import Button from './Button';
 import NavIcon from './NavIcon';
@@ -6,12 +6,42 @@ import NavIcon from './NavIcon';
 const LightboxCtx = createContext(() => {});
 export const useLightbox = () => useContext(LightboxCtx);
 
+// open(url) shows one image; open([url, url, …], index) shows a set with previous / next (arrows, keyboard, swipe)
 export function LightboxProvider({ children }) {
-  const [src, setSrc] = useState(null);
+  const [view, setView] = useState(null); // { list, index }
+  const open = useCallback((src, index = 0) => setView(src ? { list: [].concat(src), index } : null), []);
+  const close = () => setView(null);
+  const step = d => setView(v => v && { ...v, index: (v.index + d + v.list.length) % v.list.length });
+  const touch = useRef(null);
+
+  useEffect(() => {
+    if (!view) return;
+    const onKey = e => {
+      if (e.key === 'Escape') close();
+      else if (e.key === 'ArrowRight') step(1);
+      else if (e.key === 'ArrowLeft') step(-1);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [!!view]);
+
+  const many = view?.list.length > 1;
   return (
-    <LightboxCtx.Provider value={setSrc}>
+    <LightboxCtx.Provider value={open}>
       {children}
-      {src && <div id="lightbox" onClick={() => setSrc(null)}><img src={src} alt="" /></div>}
+      {view && (
+        <div id="lightbox" onClick={close} role="dialog" aria-modal="true" aria-label="Photo viewer"
+          onTouchStart={e => { touch.current = e.touches[0].clientX; }}
+          onTouchEnd={e => { const dx = e.changedTouches[0].clientX - (touch.current ?? 0); if (many && Math.abs(dx) > 50) step(dx < 0 ? 1 : -1); }}>
+          <img src={view.list[view.index]} alt="" onClick={e => { e.stopPropagation(); if (many) step(1); }} />
+          <button type="button" className="lb-close" aria-label="Close" onClick={close}>×</button>
+          {many && <>
+            <button type="button" className="lb-nav lb-prev" aria-label="Previous photo" onClick={e => { e.stopPropagation(); step(-1); }}>‹</button>
+            <button type="button" className="lb-nav lb-next" aria-label="Next photo" onClick={e => { e.stopPropagation(); step(1); }}>›</button>
+            <span className="lb-count">{view.index + 1} / {view.list.length}</span>
+          </>}
+        </div>
+      )}
     </LightboxCtx.Provider>
   );
 }

@@ -33,8 +33,9 @@ function PhotoViewer({ images, title, canEdit, busy, onUpload, onCover, onDelete
   }
   return (
     <div className="vd-gallery">
-      <div className="vd-photo">
-        <img src={fileUrl(cur.file_name)} alt={title} onClick={() => open(fileUrl(cur.file_name))} />
+      <div className="vd-photo" style={{ '--vd-bg': `url("${fileUrl(cur.file_name)}")` }}>
+        <img src={fileUrl(cur.file_name)} alt={title}
+          onClick={() => open(images.map(i => fileUrl(i.file_name)), Math.min(idx, images.length - 1))} />
         <span className="vd-photo-count">{Math.min(idx, images.length - 1) + 1} / {images.length}</span>
         {images.length > 1 && <>
           <button type="button" className="vd-nav prev" aria-label="Previous photo" onClick={() => setIdx(i => (i - 1 + images.length) % images.length)}>‹</button>

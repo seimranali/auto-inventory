@@ -7,7 +7,7 @@
 #   api\            IIS application "/api": standalone Next.js server run by HttpPlatformHandler
 #   database\       SQL script (schema + data) + uploads — business data: keep private, never in the web folder
 #   README-IIS.md   setup steps
-# plus two zips: AutoInventory-<version>-web.zip and AutoInventory-<version>-api.zip (no data, no secrets)
+# plus AutoInventory-<version>.zip containing web\, api\, README-IIS.md and VERSION.txt (no data, no secrets)
 param(
   [string]$Version = (Get-Date -Format 'yyyy.MM.dd'),
   [switch]$NoDatabase
@@ -59,10 +59,10 @@ Set-Content -Path "$out\VERSION.txt" -Value "Auto Inventory $Version`r`nBuilt $(
 $leaks = Get-ChildItem $web, $api -Recurse -Force -File | Where-Object { $_.Name -match '^\.env(\.local|\.production)?$|\.db$|\.sqlite$|\.sql$' -and $_.DirectoryName -notlike "$api\scripts*" }
 if ($leaks) { throw "Refusing to package private files: $($leaks.FullName -join ', ')" }
 
-$webZip = Join-Path $root "release\$name-web.zip"
-$apiZip = Join-Path $root "release\$name-api.zip"
-Compress-Archive -Path "$web\*" -DestinationPath $webZip -Force
-Compress-Archive -Path "$api\*", "$out\README-IIS.md", "$out\VERSION.txt" -DestinationPath $apiZip -Force
+# One zip with both parts: <name>\web, <name>\api, README-IIS.md, VERSION.txt (no database, no secrets)
+$zip = Join-Path $root "release\$name.zip"
+if (Test-Path $zip) { Remove-Item $zip -Force }
+Compress-Archive -Path $web, $api, "$out\README-IIS.md", "$out\VERSION.txt" -DestinationPath $zip -Force
 
 # database: SQL script + uploaded files — private business data, kept beside (never inside) web / api
 if (-not $NoDatabase) {
@@ -81,6 +81,7 @@ if (-not $NoDatabase) {
 }
 
 Write-Host "Done: $out" -ForegroundColor Green
-Write-Host "  web\  -> IIS site root          ($webZip)" -ForegroundColor Green
-Write-Host "  api\  -> IIS application /api   ($apiZip)" -ForegroundColor Green
+Write-Host "  web\  -> IIS site root" -ForegroundColor Green
+Write-Host "  api\  -> IIS application /api" -ForegroundColor Green
+Write-Host "  Zip (web + api): $zip" -ForegroundColor Green
 if (-not $NoDatabase) { Write-Host "  database\ -> run on SQL Server; PRIVATE (not for upload)" -ForegroundColor Yellow }
