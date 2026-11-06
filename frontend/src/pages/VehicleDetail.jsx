@@ -224,6 +224,8 @@ export default function VehicleDetail() {
           {v.location && <span>{v.location}</span>}
         </span>}
         actions={<>
+          <Button to="/inventory" title="Back to Inventory">← Inventory</Button>
+          {canEdit && <Button to="/vehicles/new">+ New Buying</Button>}
           <Button onClick={() => window.print()}>Print</Button>
           {sold && <Button to={`/vehicles/${id}/invoice`}>Invoice</Button>}
           {canSell && <Button variant={sold ? 'default' : 'primary'} to={`/vehicles/${id}/sell`}>{sold ? 'Edit Sale' : 'Sell Vehicle'}</Button>}
@@ -315,7 +317,7 @@ export default function VehicleDetail() {
                 ['Buyer', v.buyer ? <Link key="b" to={`/parties/${v.buyer.id}`}>{v.buyer.name}</Link> : v.buyer_name],
                 ['Name on Invoice', v.buyer_name], ['Buyer Contact', v.buyer_contact], ['Buyer ID', v.buyer_id_no],
                 ['Destination', [v.port, v.destination_country].filter(Boolean).join(', ') || null], ['Shipping Ref', v.shipping_ref],
-                ['Payment Method', v.payment_method], ['Sale Expenses', money(v.sale_expense || 0)],
+                ['Payment Method', v.payment_method],
               ]} />
               </section>
             )}
@@ -334,7 +336,6 @@ export default function VehicleDetail() {
             </div>
             <dl className="vd-breakdown">
               <div><dt>Total cost</dt><dd>{money(v.total_cost)}</dd></div>
-              {sold && <div><dt>Sale expenses</dt><dd>{money(v.sale_expense || 0)}</dd></div>}
               <div><dt>{sold ? 'Days to sell' : 'Days in stock'}</dt>
                 <dd><span className={`age ${days > 60 ? 'age-old' : days > 30 ? 'age-mid' : ''}`}>{days ?? '-'}{days != null ? 'd' : ''}</span></dd></div>
             </dl>

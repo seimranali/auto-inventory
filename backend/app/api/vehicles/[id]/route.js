@@ -1,4 +1,5 @@
-import { db, assignInvoiceNo, cleanVehicle, getVehicle, removeUpload, json, fail, isUnique, col, NOW } from '@/lib/db';
+import { db, assignInvoiceNo, cleanVehicle, getVehicle, removeUpload, json, fail, isUnique, col, NOW,
+  chassisKey, chassisStockError, chassisSaleError } from '@/lib/db';
 import { guard, can } from '@/lib/auth';
 
 export const runtime = 'nodejs';
@@ -14,7 +15,8 @@ export const GET = guard('vehicles:read', async (_req, { params }) => {
 
 export const PUT = guard(null, async (req, { params }, user) => {
   const { id } = await params;
-  if (!await db.get('SELECT 1 x FROM vehicles WHERE id = ?', id)) return fail('Vehicle not found', 404);
+  const current = await db.get('SELECT id, chassis_no, status, purchase_date FROM vehicles WHERE id = ?', id);
+  if (!current) return fail('Vehicle not found', 404);
   try {
     const data = cleanVehicle(await req.json());
     if (!can(user, 'vehicles:write')) {
@@ -22,6 +24,21 @@ export const PUT = guard(null, async (req, { params }, user) => {
       if (!can(user, 'sales:write')) return fail('You do not have permission to do this', 403);
       Object.keys(data).forEach(k => SALE_FIELDS.has(k) || delete data[k]);
       if (data.status && data.status !== 'Sold') return fail('You can only record sales', 403);
+    }
+    if (data.chassis_no) data.chassis_no = String(data.chassis_no).trim();
+
+    // Chassis rules, checked against the vehicle as it will be after this change
+    const after = { ...current, ...data };
+    const chassisChanged = 'chassis_no' in data && chassisKey(data.chassis_no) !== chassisKey(current.chassis_no);
+    // Back in stock (new chassis, or a sale undone): no other vehicle with this chassis may be in stock
+    if (after.status !== 'Sold' && (chassisChanged || current.status === 'Sold')) {
+      const dup = await chassisStockError(after.chassis_no, id);
+      if (dup) return fail(dup, 409);
+    }
+    // Being sold now (not editing an existing sale): the same chassis must not have been sold already
+    if (after.status === 'Sold' && (current.status !== 'Sold' || chassisChanged)) {
+      const twice = await chassisSaleError(after);
+      if (twice) return fail(twice, 409);
     }
     const cols = Object.keys(data);
     if (cols.length) {

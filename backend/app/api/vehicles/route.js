@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { db, assignInvoiceNo, nextStockNo, SELECT_VEHICLE, cleanVehicle, getVehicle, json, fail, isUnique, col } from '@/lib/db';
+import { db, assignInvoiceNo, nextStockNo, chassisStockError, chassisSaleError, SELECT_VEHICLE, cleanVehicle, getVehicle, json, fail, isUnique, col } from '@/lib/db';
 import { guard } from '@/lib/auth';
 
 export const runtime = 'nodejs';
@@ -21,7 +21,15 @@ export const POST = guard('vehicles:write', async req => {
   try {
     const data = cleanVehicle(await req.json());
     data.status ||= 'In Stock';
+    if (data.chassis_no) data.chassis_no = String(data.chassis_no).trim();
     const id = crypto.randomUUID();
+    // One vehicle in stock per chassis; a sold chassis may be bought again
+    const dup = await chassisStockError(data.chassis_no, id);
+    if (dup) return fail(dup, 409);
+    if (data.status === 'Sold') {
+      const twice = await chassisSaleError({ ...data, id });
+      if (twice) return fail(twice, 409);
+    }
     const auto = !data.stock_no;
     // Blank stock no → next number; retry if another user took the same number at the same moment
     for (let attempt = 0; ; attempt++) {

@@ -1,15 +1,23 @@
-# Builds an IIS release of Auto Inventory into release\iis (and release\AutoInventory-iis-<date>.zip)
+# Builds an IIS release of Auto Inventory with the website and the API in separate folders.
 #
-#   powershell -ExecutionPolicy Bypass -File deploy\build-iis.ps1
+#   powershell -ExecutionPolicy Bypass -File deploy\build-iis.ps1 [-Version 1.2.0] [-NoDatabase]
 #
-# Layout (copy the whole folder to the server, e.g. C:\inetpub\AutoInventory):
-#   web.config        site root: React app + SPA routing
-#   index.html, assets\...
-#   api\              IIS application "/api": Next.js server run by HttpPlatformHandler
-#   README-IIS.md     setup steps
+# Output: release\AutoInventory-<version>\
+#   web\            IIS site root: React app + web.config (SPA routing, caching)
+#   api\            IIS application "/api": standalone Next.js server run by HttpPlatformHandler
+#   database\       SQL script (schema + data) + uploads — business data: keep private, never in the web folder
+#   README-IIS.md   setup steps
+# plus two zips: AutoInventory-<version>-web.zip and AutoInventory-<version>-api.zip (no data, no secrets)
+param(
+  [string]$Version = (Get-Date -Format 'yyyy.MM.dd'),
+  [switch]$NoDatabase
+)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
-$out = Join-Path $root 'release\iis'
+$name = "AutoInventory-$Version"
+$out = Join-Path $root "release\$name"
+$web = Join-Path $out 'web'
+$api = Join-Path $out 'api'
 
 Write-Host '== Frontend build' -ForegroundColor Cyan
 Push-Location "$root\frontend"
@@ -29,43 +37,50 @@ Pop-Location
 
 Write-Host "== Assembling $out" -ForegroundColor Cyan
 if (Test-Path $out) { Remove-Item $out -Recurse -Force }
-New-Item -ItemType Directory -Force $out | Out-Null
+New-Item -ItemType Directory -Force $web, $api | Out-Null
 
-# Site root: built React app + routing config
-Copy-Item "$root\frontend\dist\*" $out -Recurse
-Copy-Item "$PSScriptRoot\iis\web.config" "$out\web.config"
+# web: built React app + routing config
+Copy-Item "$root\frontend\dist\*" $web -Recurse
+Remove-Item "$web\_headers" -Force -ErrorAction SilentlyContinue   # Cloudflare-only file
+Copy-Item "$PSScriptRoot\iis\web.config" "$web\web.config"
 
-# /api application: standalone Next.js server (never ship local data or dev secrets)
-$api = Join-Path $out 'api'
-Copy-Item "$root\backend\.next\standalone" $api -Recurse
-Remove-Item "$api\data", "$api\.env", "$api\.env.local" -Recurse -Force -ErrorAction SilentlyContinue
+# api: standalone Next.js server (never ship local data or dev secrets)
+Copy-Item "$root\backend\.next\standalone\*" $api -Recurse
+Remove-Item "$api\data", "$api\.env", "$api\.env.local", "$api\.env.production" -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force "$api\.next\static", "$api\logs", "$api\scripts" | Out-Null
 if (Test-Path "$root\backend\.next\static") { Copy-Item "$root\backend\.next\static\*" "$api\.next\static" -Recurse }
 Copy-Item "$PSScriptRoot\iis\api.web.config" "$api\web.config"
 Copy-Item "$root\backend\.env.example" "$api\.env.production.example"
-Copy-Item "$root\backend\scripts\import-mubashirjp.sql", "$root\backend\scripts\import-mubashirjp-expenses.sql", "$root\backend\scripts\sync-mubashirjp-prices.sql", "$root\backend\scripts\update-price-from-mubashirjp-items.sql", "$root\backend\scripts\report-mubashirjp-price-mismatch.sql", "$root\backend\scripts\import-mubashirjp-logo.mjs" "$api\scripts"
+Copy-Item "$root\backend\scripts\*.sql", "$root\backend\scripts\import-mubashirjp-logo.mjs" "$api\scripts"
 Copy-Item "$PSScriptRoot\iis\README-IIS.md" "$out\README-IIS.md"
+Set-Content -Path "$out\VERSION.txt" -Value "Auto Inventory $Version`r`nBuilt $(Get-Date -Format 'yyyy-MM-dd HH:mm')`r`nCommit $(git -C $root rev-parse --short HEAD 2>$null)" -Encoding ascii
 
-$stamp = Get-Date -Format yyyyMMdd-HHmm
-$zip = Join-Path $root "release\AutoInventory-iis-$stamp.zip"
-Compress-Archive -Path "$out\*" -DestinationPath $zip -Force
+# Safety check: nothing secret or private in the deployable folders
+$leaks = Get-ChildItem $web, $api -Recurse -Force -File | Where-Object { $_.Name -match '^\.env(\.local|\.production)?$|\.db$|\.sqlite$|\.sql$' -and $_.DirectoryName -notlike "$api\scripts*" }
+if ($leaks) { throw "Refusing to package private files: $($leaks.FullName -join ', ')" }
 
-# Database script + uploaded files, kept OUTSIDE the site folder so IIS can never serve them
-Write-Host '== Database export' -ForegroundColor Cyan
-$dbOut = Join-Path $root "release\database"
-if (Test-Path $dbOut) { Remove-Item $dbOut -Recurse -Force }
-New-Item -ItemType Directory -Force $dbOut | Out-Null
-$sqlFile = Join-Path $dbOut "AutoInventory-$stamp.sql"
-if (Test-Path "$root\backend\.env.local") {
-  Push-Location "$root\backend"
-  node --env-file=.env.local scripts/export-database.mjs $sqlFile
-  if ($LASTEXITCODE) { throw 'database export failed' }
-  Pop-Location
-  if (Test-Path "$root\backend\data\uploads") { Copy-Item "$root\backend\data\uploads" "$dbOut\uploads" -Recurse }
-} else {
-  Write-Warning 'backend\.env.local not found - database export skipped'
+$webZip = Join-Path $root "release\$name-web.zip"
+$apiZip = Join-Path $root "release\$name-api.zip"
+Compress-Archive -Path "$web\*" -DestinationPath $webZip -Force
+Compress-Archive -Path "$api\*", "$out\README-IIS.md", "$out\VERSION.txt" -DestinationPath $apiZip -Force
+
+# database: SQL script + uploaded files — private business data, kept beside (never inside) web / api
+if (-not $NoDatabase) {
+  Write-Host '== Database export' -ForegroundColor Cyan
+  $dbOut = Join-Path $out 'database'
+  New-Item -ItemType Directory -Force $dbOut | Out-Null
+  if (Test-Path "$root\backend\.env.local") {
+    Push-Location "$root\backend"
+    node --env-file=.env.local scripts/export-database.mjs (Join-Path $dbOut "AutoInventory-$Version.sql")
+    if ($LASTEXITCODE) { throw 'database export failed' }
+    Pop-Location
+    if (Test-Path "$root\backend\data\uploads") { Copy-Item "$root\backend\data\uploads" "$dbOut\uploads" -Recurse }
+  } else {
+    Write-Warning 'backend\.env.local not found - database export skipped'
+  }
 }
 
 Write-Host "Done: $out" -ForegroundColor Green
-Write-Host "Zip:  $zip" -ForegroundColor Green
-Write-Host "DB:   $dbOut  (SQL script + uploads - copy to the server, do not put in the web folder)" -ForegroundColor Green
+Write-Host "  web\  -> IIS site root          ($webZip)" -ForegroundColor Green
+Write-Host "  api\  -> IIS application /api   ($apiZip)" -ForegroundColor Green
+if (-not $NoDatabase) { Write-Host "  database\ -> run on SQL Server; PRIVATE (not for upload)" -ForegroundColor Yellow }

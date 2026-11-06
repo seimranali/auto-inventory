@@ -45,7 +45,6 @@ const defs = {
   buyer_name: { key: 'buyer_name', label: 'Buyer' },
   destination: { key: 'destination', label: 'Destination', value: v => [v.port, v.destination_country].filter(Boolean).join(', ') },
   sale_price: { key: 'sale_price', label: 'Sale Price', align: 'right', format: money, total: 'sum' },
-  sale_expense: { key: 'sale_expense', label: 'Sale Exp.', align: 'right', format: money, total: 'sum' },
   profit: {
     key: 'profit', label: 'Profit', align: 'right', total: 'sum',
     format: n => <span className={n > 0 ? 'pos' : n < 0 ? 'neg' : ''}>{money(n)}</span>,

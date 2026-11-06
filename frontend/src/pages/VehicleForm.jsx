@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { formatDate } from '../dates';
+import { t } from '../i18n';
 import { api, loadField } from '../api';
 import { useForm } from '../hooks';
 import * as C from '../constants';
@@ -8,6 +10,25 @@ import { PageHeader, Panel, FormGrid, Input, Select, DateField, TextArea, Field,
 import PartyPicker from '../components/PartyPicker';
 
 const n = v => Number(v) || 0;
+
+// Message under the chassis field: in stock already (error), or sold before (info: can be bought again)
+function ChassisHint({ id, check }) {
+  const { inStock, sold } = check;
+  const name = x => [x.stock_no, x.year, x.make, x.model].filter(Boolean).join(' ');
+  if (inStock) return (
+    <span id={id} className="field-hint field-error">
+      {t('Already in stock as')} <Link to={`/vehicles/${inStock.id}`} target="_blank">{name(inStock)}</Link> ({t(inStock.status)}).{' '}
+      {t('It can be added again only after that vehicle is sold.')}
+    </span>
+  );
+  if (sold.length) return (
+    <span id={id} className="field-hint field-ok">
+      {t('Bought and sold before')}: <Link to={`/vehicles/${sold[0].id}`} target="_blank">{name(sold[0])}</Link>
+      {sold[0].sale_date ? ` · ${t('sold')} ${formatDate(sold[0].sale_date)}` : ''}{sold.length > 1 ? ` (+${sold.length - 1})` : ''}. {t('OK to buy again.')}
+    </span>
+  );
+  return null;
+}
 
 export default function VehicleForm() {
   const { id } = useParams();
@@ -33,6 +54,15 @@ export default function VehicleForm() {
     api.nextStockNo(v.purchase_date).then(r => setNextStock(r.stock_no)).catch(() => setNextStock(''));
   }, [id, v.purchase_date?.slice(0, 7)]);
 
+  // Live chassis check: blocked while the same chassis is in stock; allowed (with a note) if it was sold before
+  const [chassis, setChassis] = useState({ inStock: null, sold: [] });
+  useEffect(() => {
+    const value = (v.chassis_no || '').trim();
+    if (!value) return setChassis({ inStock: null, sold: [] });
+    const timer = setTimeout(() => api.chassisCheck(value, id).then(setChassis).catch(() => {}), 350);
+    return () => clearTimeout(timer);
+  }, [v.chassis_no, id]);
+
   // Link the seller party and keep the text snapshot; auction houses also fill the auction fields
   const pickSeller = party => form.setValues(x => {
     if (!party) return { ...x, seller_party_id: '', supplier: '' };
@@ -52,6 +82,7 @@ export default function VehicleForm() {
     e.preventDefault();
     if (!v.make || !v.model) return toast('Make and Model are required', 'error');
     if (isSold && (!v.sale_date || !v.sale_price || !v.sale_type)) return toast('Sold vehicles need Sale Type, Sale Date and Sale Price', 'error');
+    if (chassis.inStock && !isSold) return toast(`Chassis ${v.chassis_no} is already in stock as ${chassis.inStock.stock_no}`, 'error');
     setSaving(true);
     try {
       const saved = id ? await api.updateVehicle(id, v) : await api.createVehicle(v);
@@ -80,7 +111,11 @@ export default function VehicleForm() {
         <FormGrid>
           <Input {...p} name="stock_no" label="Stock No" placeholder={id ? '' : nextStock ? `Auto · ${nextStock}` : 'Auto'}
             hint={!id && !v.stock_no ? 'Leave blank to number automatically' : undefined} />
-          <Input {...p} name="chassis_no" label="Chassis / VIN No" />
+          <Field label="Chassis / VIN No">
+            <input value={v.chassis_no ?? ''} onChange={e => form.set('chassis_no', e.target.value)}
+              className={chassis.inStock ? 'invalid' : ''} aria-invalid={!!chassis.inStock} aria-describedby="chassis-hint" />
+            <ChassisHint id="chassis-hint" check={chassis} />
+          </Field>
           <Input {...p} name="engine_no" label="Engine No" />
           <Select {...p} name="make" label="Make *" options={C.MAKE_OPTIONS} loadOptions={loadField('make')} creatable sortable
             onChange={m => m !== v.make && form.set('model', '')} />
@@ -153,7 +188,6 @@ export default function VehicleForm() {
               <DateField {...p} name="sale_date" label="Sale Date *" min={v.purchase_date || undefined} max={today()}
                 hint={v.purchase_date ? 'Cannot be before the purchase date' : undefined} />
               <Input {...p} name="sale_price" label="Sale Price *" type="number" min="0" step="any" />
-              <Input {...p} name="sale_expense" label="Sale Expenses" type="number" min="0" step="any" hint="Commission, transport, export docs…" />
               <Select {...p} name="buyer_name" label="Buyer Name" loadOptions={loadField('buyer_name')} creatable />
               <Input {...p} name="buyer_contact" label="Buyer Contact" />
               {v.sale_type === 'Export' && <>

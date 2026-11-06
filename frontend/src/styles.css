@@ -24,6 +24,10 @@ a { color: var(--primary); }
 .two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 0 18px; }
 .error-box { background: #fee2e2; color: var(--red); padding: 12px 16px; border-radius: 6px; }
 .hint, .field-hint { font-size: 12px; font-weight: 400; margin-top: 2px; }
+.field-hint.field-error { color: var(--red); }
+.field-hint.field-ok { color: var(--green); }
+.field-hint a { font-weight: 600; }
+input.invalid { border-color: var(--red); box-shadow: 0 0 0 3px #fee2e2; }
 .table-tools { justify-content: space-between; margin-bottom: 8px; }
 tr.clickable { cursor: pointer; }
 label.inline { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 600; }
@@ -919,4 +923,65 @@ textarea { min-height: 70px; resize: vertical; }
   .page-header { padding: 0 0 12px; }
   .panel, .card, .table-wrap { border-color: #999; }
   th, td { padding: 4px 6px; font-size: 11px; }
+}
+
+/* ===================== Responsive refinements (phones / tablets) ===================== */
+/* Grid and flex children may shrink below their content, so long values wrap or scroll instead of widening the page */
+.panel, .card, .dash-grid > *, .kpi-grid > *, .vd-main, .vd-side, .company-layout > * { min-width: 0; }
+.panel-head > * { min-width: 0; }
+.table-wrap { -webkit-overflow-scrolling: touch; }
+
+/* Tab rows scroll sideways instead of overflowing */
+.tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs button { flex-shrink: 0; white-space: nowrap; }
+
+@media (max-width: 900px) {
+  .dash-grid, .dash-grid-3 { grid-template-columns: minmax(0, 1fr); }
+}
+/* Tablets / small laptops: summary boxes as an even 2 x 2 instead of 3 + 1 with cut-off values */
+@media (min-width: 641px) and (max-width: 1100px) {
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  /* Summary boxes: two per row, compact */
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .card.card-hero { padding: 12px; gap: 8px; border-radius: 10px; }
+  .card-icon { width: 28px; height: 28px; }
+  .card-icon svg { width: 26px; height: 26px; }
+  .card-hero .label { font-size: 12px; }
+  .card-hero .value { font-size: 17px; }
+  .card-hero .hint { font-size: 11px; line-height: 1.35; }
+  .chip-row { gap: 6px; }
+  .chip { padding: 4px 10px; font-size: 12px; }
+
+  /* Page header: title wraps, buttons compact and in one tidy row */
+  .page-header { padding: 14px 0 10px; gap: 10px; }
+  .page-header h1 { flex-wrap: wrap; font-size: 19px; }
+  .page-header > .row.no-print { gap: 6px; width: 100%; }
+  .page-header > .row.no-print .btn { padding: 6px 11px; font-size: 13px; min-height: 34px; }
+
+  /* Panels and toolbars */
+  .panel { padding: 12px; border-radius: 10px; }
+  .panel-head h2 { font-size: 15px; }
+  .grid-toolbar { gap: 8px; }
+  .grid-toolbar .dd { min-width: 0; flex: 1 1 150px; }
+  .report-bar { align-items: stretch; }
+  .report-bar .dp-range, .report-bar .dp-range-control { width: 100%; min-width: 0; }
+  .status-tab { padding: 8px 10px; }
+  .pager { flex-wrap: wrap; gap: 8px; justify-content: center; }
+}
+
+@media (max-width: 420px) {
+  /* Very narrow phones: drop the icons so values have room */
+  .card-icon { display: none; }
+  .card-hero .value { font-size: 16px; }
+}
+
+/* Touch screens: comfortable tap targets for icon buttons and table actions */
+@media (pointer: coarse) {
+  .icon-btn { width: 38px; height: 38px; }
+  .th-filter { width: 30px; height: 30px; }
+  .row-actions { gap: 6px; }
 }

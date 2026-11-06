@@ -248,6 +248,40 @@ export const selectVehicles = top => `SELECT ${top ? `TOP ${Number(top)} ` : ''}
   FROM vehicles v`;
 export const SELECT_VEHICLE = selectVehicles();
 
+// ---- Chassis numbers: one vehicle in stock per chassis; a chassis can be bought again only after it was sold ----
+// Compared ignoring case and spaces
+export const CHASSIS_KEY_SQL = "UPPER(REPLACE(LTRIM(RTRIM(chassis_no)), ' ', ''))";
+export const chassisKey = c => String(c || '').replace(/\s+/g, '').toUpperCase();
+
+// Other vehicles with the same chassis: { inStock: vehicle | null, sold: [vehicles] }
+export async function chassisMatches(chassis, excludeId = '') {
+  const key = chassisKey(chassis);
+  if (!key) return { inStock: null, sold: [] };
+  const rows = await db.all(`SELECT id, stock_no, make, model, year, status, purchase_date, sale_date, invoice_no, buyer_name
+    FROM vehicles WHERE ${CHASSIS_KEY_SQL} = ? AND id <> ? ORDER BY purchase_date DESC, created_at DESC`, key, excludeId || '');
+  return { inStock: rows.find(r => r.status !== 'Sold') || null, sold: rows.filter(r => r.status === 'Sold') };
+}
+
+const label = v => `${v.stock_no || 'a vehicle'} (${[v.year, v.make, v.model].filter(Boolean).join(' ')})`;
+
+// Error message when a vehicle with this chassis may not be in stock now, else null
+export async function chassisStockError(chassis, excludeId) {
+  const { inStock } = await chassisMatches(chassis, excludeId);
+  return inStock
+    ? `Chassis ${chassis} is already in stock as ${label(inStock)} — ${inStock.status}. The same chassis can be added again only after that vehicle is sold.`
+    : null;
+}
+
+// Error message when selling would sell the same chassis twice: it was already sold after this vehicle was bought
+export async function chassisSaleError(v) {
+  if (!chassisKey(v.chassis_no)) return null;
+  const { sold } = await chassisMatches(v.chassis_no, v.id);
+  const again = sold.find(s => !v.purchase_date || !s.sale_date || s.sale_date >= v.purchase_date);
+  return again
+    ? `Chassis ${v.chassis_no} was already sold as ${label(again)} on ${again.sale_date || 'an earlier date'}${again.invoice_no ? ` (invoice ${again.invoice_no})` : ''}, after this vehicle was bought. A vehicle can't be sold twice.`
+    : null;
+}
+
 // Next stock number for the purchase month: V + YYMM + 4-digit sequence (V26110017), same scheme as MubashirJP
 export async function nextStockNo(date) {
   const d = /^\d{4}-\d{2}/.test(date || '') ? date : new Date().toISOString();

@@ -118,7 +118,6 @@ export default function SalePage() {
             <Select {...p} name="sale_type" label="Sale Type *" options={SALE_TYPES} placeholder={false} searchable={false} />
             <DateField {...p} name="sale_date" label="Sale Date *" min={vehicle.purchase_date || undefined} max={today()} />
             <Input {...p} name="sale_price" label="Sale Price *" type="number" min="0" step="any" />
-            <Input {...p} name="sale_expense" label="Sale Expenses" type="number" min="0" step="any" hint="Commission, transport, docs (internal)" />
           </FormGrid>
           {s.sale_type === 'Export' && (
             <div style={{ marginTop: 12 }}>

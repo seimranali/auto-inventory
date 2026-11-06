@@ -19,7 +19,6 @@ const summaryColumns = label => [
   { key: 'count', label: 'Sold', align: 'right', total: 'sum' },
   { key: 'revenue', label: 'Revenue', align: 'right', format: money, total: 'sum' },
   { key: 'cost', label: 'Cost', align: 'right', format: money, total: 'sum' },
-  { key: 'sale_expense', label: 'Sale Exp.', align: 'right', format: money, total: 'sum' },
   { key: 'profit', label: 'Profit', align: 'right', format: signed, total: 'sum' },
   { key: 'avg', label: 'Avg / Vehicle', align: 'right', value: r => (r.count ? r.profit / r.count : 0), format: money },
   {
@@ -108,7 +107,7 @@ export default function ProfitReport() {
           <StatCard icon="available" accent="violet" label="Net Margin" value={pct(margin(net, t.revenue))}
             hint={withExp ? `Gross ${pct(margin(t.profit, t.revenue))} before expenses · revenue ${compact(t.revenue)}` : `On revenue of ${money(t.revenue)}`} />
           <StatCard icon="cash" accent="blue" label="Total Cost" value={money(t.cost + t.sale_expense)}
-            hint={`Vehicles ${compact(t.cost)} · sale expenses ${compact(t.sale_expense)}`} />
+            hint={`${t.count} vehicles sold · avg ${compact((t.cost + t.sale_expense) / t.count)} each`} />
           <StatCard icon="clock" accent="amber" label="Avg Days to Sell" value={avgDays ?? '-'}
             hint={`${losses.length} sold at a loss${losses.length ? ` (${money(losses.reduce((a, v) => a + v.profit, 0))})` : ''}`} />
         </div>
@@ -120,10 +119,9 @@ export default function ProfitReport() {
             ...(withExp ? [{ label: 'Operating expenses', value: expTotal, display: money(expTotal) }] : []),
             { label: 'Net profit', value: Math.max(0, net), display: money(net) },
           ]} />
-          <div className="muted" style={{ fontSize: 12 }}>
-            Sale expenses: {money(t.sale_expense)} ({pct(margin(t.sale_expense, t.revenue))} of revenue)
-            {withExp && <> · Operating expenses: {money(expTotal)} ({pct(margin(expTotal, t.revenue))} of revenue)</>}
-          </div>
+          {withExp && <div className="muted" style={{ fontSize: 12 }}>
+            Operating expenses: {money(expTotal)} ({pct(margin(expTotal, t.revenue))} of revenue)
+          </div>}
         </Panel>
 
         <div className="dash-grid no-print">
@@ -186,7 +184,7 @@ export default function ProfitReport() {
           {tab === 'detailed' && (
             <DataTable rows={rows} exportName="profit-detailed" onPrint={print} footerRows={expenseRows} onRowClick={v => nav(`/vehicles/${v.id}`)} filterable groupable pageSize={20}
               columns={vehicleColumns('stock_no', 'vehicle', 'make', 'sale_type', 'sale_date', 'buyer_name', 'destination', 'days',
-                'total_cost', 'sale_price', 'sale_expense', 'profit', 'margin')} />
+                'total_cost', 'sale_price', 'profit', 'margin')} />
           )}
           {tab === 'type' && <DataTable rows={data.bySaleType} rowKey="label" exportName="profit-by-sale-type" onPrint={print} footerRows={expenseRows} columns={summaryColumns('Sale Type')} />}
           {tab === 'make' && <DataTable rows={data.byMake} rowKey="label" exportName="profit-by-make" onPrint={print} footerRows={expenseRows} columns={summaryColumns('Make')} />}

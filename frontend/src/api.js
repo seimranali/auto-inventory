@@ -25,6 +25,7 @@ export const api = {
   vehicles: params => request(`/vehicles${qs(params)}`),
   vehicle: id => request(`/vehicles/${id}`),
   createVehicle: data => send('POST', '/vehicles', data),
+  chassisCheck: (chassis, id) => request(`/vehicles/chassis-check${qs({ chassis, id })}`),
   nextStockNo: date => request(`/vehicles/next-stock-no${qs({ date })}`),
   updateVehicle: (id, data) => send('PUT', `/vehicles/${id}`, data),
   deleteVehicle: id => request(`/vehicles/${id}`, { method: 'DELETE' }),
