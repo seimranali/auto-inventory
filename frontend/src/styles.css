@@ -297,7 +297,6 @@ label.inline { display: flex; align-items: center; gap: 6px; color: var(--muted)
 .vd-gallery { margin-bottom: 14px; }
 /* Main photo: height-capped so the gallery below stays in view; the whole vehicle shows (no cropping) */
 .vd-photo { position: relative; height: clamp(220px, 46vh, 430px); background: #0f172a; border-radius: 12px; overflow: hidden; }
-.vd-photo::before { content: ''; position: absolute; inset: -20px; background: var(--vd-bg) center / cover; filter: blur(18px) brightness(.55); }
 .vd-photo img { position: relative; width: 100%; height: 100%; object-fit: contain; cursor: zoom-in; display: block; }
 .vd-photo-count { position: absolute; right: 12px; bottom: 12px; background: rgba(15, 23, 42, .7); color: #fff; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 12px; }
 .vd-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; border: 0;
@@ -307,7 +306,7 @@ label.inline { display: flex; align-items: center; gap: 6px; color: var(--muted)
 .vd-photo-empty { aspect-ratio: auto; min-height: 260px; background: linear-gradient(135deg, #f1f4f9, #e4e9f1); border: 1px solid var(--line);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #8a94a6; padding: 24px; margin-bottom: 14px; }
 .vd-photo-empty p { margin: 0 0 10px; font-weight: 600; }
-.vd-photo-empty .dropzone { width: 100%; max-width: 420px; background: rgba(255, 255, 255, .7); }
+.vd-photo-empty .dropzone { position: relative; z-index: 1; width: 100%; max-width: 420px; background: rgba(255, 255, 255, .7); }
 /* Gallery: every photo as a thumbnail grid under the main photo */
 .vd-thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; margin-top: 10px; }
 .vd-thumbs figure { position: relative; margin: 0; aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden; border: 2px solid transparent; background: #e5e7eb; }
