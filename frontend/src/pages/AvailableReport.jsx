@@ -9,6 +9,8 @@ import {
   vehicleColumns, agingBucket, AGING_BUCKETS,
 } from '../components';
 import BarChart from '../components/BarChart';
+import CompanyBreakdown from '../components/CompanyBreakdown';
+import { useCompanyColumns } from '../components/CompanySwitcher';
 
 const AVAILABLE = STATUSES.filter(s => s !== 'Sold');
 const TOP = 10;
@@ -17,6 +19,7 @@ const sum = (rows, f) => rows.reduce((a, r) => a + (f(r) || 0), 0);
 export default function AvailableReport() {
   const nav = useNavigate();
   const { data, error, loading } = useAsync(() => api.report('available'));
+  const companyCols = useCompanyColumns();
   const [status, setStatus] = useState('');
   const [allMakes, setAllMakes] = useState(false);
 
@@ -93,6 +96,12 @@ export default function AvailableReport() {
           hint={stats.oldest != null ? `Oldest ${stats.oldest} days · ${money(atRisk)} over 60 days` : '-'} />
       </div>
 
+      <CompanyBreakdown rows={data.byCompany} columns={[
+        { key: 'count', label: 'Vehicles', align: 'right' },
+        { key: 'cost', label: 'Stock Value (Cost)', align: 'right', format: money },
+        { key: 'asking', label: 'Asking Total', align: 'right', format: money },
+      ]} />
+
       {rows.length === 0 ? <Panel><EmptyState>No vehicles in this status.</EmptyState></Panel> : <>
         <div className="dash-grid dash-grid-3">
           <Panel title="Stock Aging" actions={<span className="muted">Vehicles by days in stock</span>}>
@@ -144,7 +153,7 @@ export default function AvailableReport() {
           <div className="row spread panel-head"><h2>Detailed List</h2></div>
           <DataTable rows={rows} exportName="available-vehicles" onRowClick={v => nav(`/vehicles/${v.id}`)}
             filterable groupable pageSize={20}
-            columns={vehicleColumns('photo', 'stock_no', 'vehicle', 'make', 'chassis_no', 'color', 'mileage', 'grade', 'status',
+            columns={vehicleColumns('photo', 'stock_no', ...companyCols, 'vehicle', 'make', 'chassis_no', 'color', 'mileage', 'grade', 'status',
               'location', 'purchase_date', 'age', 'aging_bucket', 'total_cost', 'asking_price', 'expected_profit')} />
         </div>
       </>}

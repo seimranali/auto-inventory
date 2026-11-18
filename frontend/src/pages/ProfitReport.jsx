@@ -10,6 +10,8 @@ import {
   SaleTypeBadge, vehicleColumns,
 } from '../components';
 import BarChart, { SplitBar } from '../components/BarChart';
+import CompanyBreakdown from '../components/CompanyBreakdown';
+import { useCompanyColumns } from '../components/CompanySwitcher';
 
 const signed = n => <span className={n > 0 ? 'pos' : n < 0 ? 'neg' : ''}>{money(n)}</span>;
 
@@ -51,6 +53,7 @@ export default function ProfitReport() {
   useLandscapePrint();
   const print = () => window.print();
   const { data, error, loading } = useAsync(() => api.report('profit', filter), [filter.from, filter.to, filter.sale_type]);
+  const companyCols = useCompanyColumns();
   // Sale-type tab counts come from the unfiltered-by-type query so they stay stable
   const { data: allTypes } = useAsync(() => api.report('profit', { from: filter.from, to: filter.to }), [filter.from, filter.to]);
 
@@ -111,6 +114,24 @@ export default function ProfitReport() {
           <StatCard icon="clock" accent="amber" label="Avg Days to Sell" value={avgDays ?? '-'}
             hint={`${losses.length} sold at a loss${losses.length ? ` (${money(losses.reduce((a, v) => a + v.profit, 0))})` : ''}`} />
         </div>
+
+        {/* Combined view: each company's result, net of its own expenses */}
+        <CompanyBreakdown note={withExp ? 'Net = vehicle profit − that company’s expenses' : 'Expenses are not split by sale type'}
+          rows={data.byCompany.map(r => {
+            const e = withExp ? (exp.byCompany.find(x => String(x.company_id) === String(r.company_id))?.amount || 0) : 0;
+            return { ...r, expenses: e, net: r.profit - e };
+          }).concat(withExp ? exp.byCompany.filter(x => !data.byCompany.some(r => String(r.company_id) === String(x.company_id)))
+            .map(x => ({ company_id: x.company_id, count: 0, revenue: 0, cost: 0, profit: 0, expenses: x.amount, net: -x.amount })) : [])}
+          columns={[
+            { key: 'count', label: 'Sold', align: 'right' },
+            { key: 'revenue', label: 'Revenue', align: 'right', format: money },
+            { key: 'cost', label: 'Cost', align: 'right', format: money },
+            { key: 'profit', label: 'Vehicle Profit', align: 'right', format: signed },
+            ...(withExp ? [{ key: 'expenses', label: 'Expenses', align: 'right', format: money },
+              { key: 'net', label: 'Net Profit', align: 'right', format: signed }] : []),
+            { key: 'margin', label: 'Margin', align: 'right', value: r => margin(withExp ? r.net : r.profit, r.revenue), format: pct,
+              total: rs => pct(margin(rs.reduce((a, r) => a + (withExp ? r.net : r.profit), 0), rs.reduce((a, r) => a + (r.revenue || 0), 0))) },
+          ]} />
 
         {/* Where the money went: revenue = cost + expenses + profit */}
         <Panel title="Revenue Breakdown" className="no-print">
@@ -183,7 +204,7 @@ export default function ProfitReport() {
           </h2>
           {tab === 'detailed' && (
             <DataTable rows={rows} exportName="profit-detailed" onPrint={print} footerRows={expenseRows} onRowClick={v => nav(`/vehicles/${v.id}`)} filterable groupable pageSize={20}
-              columns={vehicleColumns('stock_no', 'vehicle', 'make', 'sale_type', 'sale_date', 'buyer_name', 'destination', 'days',
+              columns={vehicleColumns('stock_no', ...companyCols, 'vehicle', 'make', 'sale_type', 'sale_date', 'buyer_name', 'destination', 'days',
                 'total_cost', 'sale_price', 'profit', 'margin')} />
           )}
           {tab === 'type' && <DataTable rows={data.bySaleType} rowKey="label" exportName="profit-by-sale-type" onPrint={print} footerRows={expenseRows} columns={summaryColumns('Sale Type')} />}

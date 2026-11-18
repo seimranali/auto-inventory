@@ -1,18 +1,41 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api, fileUrl } from '../api';
 import { useForm } from '../hooks';
 import { useAuth } from '../auth';
 import { formatAddress, JP_ACCOUNT_LABEL } from '../format';
-import { PageHeader, Panel, FormGrid, Input, Select, TextArea, Button, FileDropzone, useToast } from '../components';
+import { PageHeader, Panel, FormGrid, Input, Select, TextArea, Button, FileDropzone, Tabs, useToast } from '../components';
 import { COUNTRY_OPTIONS, JP_PREFECTURES, JP_ACCOUNT_TYPES } from '../constants';
 import { partyError } from '../components/PartyFields';
 
 const CURRENCIES = ['JPY', 'USD', 'PKR', 'AED', 'GBP', 'EUR', 'KES', 'TZS', 'UGX', 'LKR', 'BDT', 'NZD'];
 
+// Settings → Companies: one tab per company, plus "Add Company". ?id=<company id> | ?id=new
 export default function CompanyPage() {
-  const { company, setCompany, can } = useAuth();
+  const { companies, mainCompany } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const wanted = params.get('id');
+  const selected = wanted === 'new' ? 'new' : String(companies.find(c => String(c.id) === wanted)?.id ?? mainCompany?.id ?? 'new');
+  const tabs = [
+    ...companies.map(c => ({ id: String(c.id), label: `${c.name}${c.active === 0 ? ' (archived)' : ''}` })),
+    { id: 'new', label: '+ Add Company' },
+  ];
+  return (
+    <>
+      {companies.length > 0 && <Tabs tabs={tabs} value={selected} onChange={id => setParams({ id })} />}
+      <CompanyEditor key={selected} id={selected === 'new' ? null : Number(selected)} onCreated={c => setParams({ id: String(c.id) })} />
+    </>
+  );
+}
+
+function CompanyEditor({ id, onCreated }) {
+  const { companyOf, mainCompany, setCompany, reloadCompanies, can } = useAuth();
   const toast = useToast();
-  const form = useForm(company || {});
+  const company = id ? companyOf(id) : null;
+  const isNew = !id;
+  const isMain = company && company.id === mainCompany?.id;
+  // A new company starts from the main company's country, currency and terms
+  const form = useForm(company || { country: mainCompany?.country || 'Japan', currency: mainCompany?.currency, terms: mainCompany?.terms });
   const [saving, setSaving] = useState(false);
   const editable = can('company:manage');
   const v = form.values;
@@ -23,15 +46,29 @@ export default function CompanyPage() {
     // Reuse the party format checks (〒, 法人番号, T-number, branch code, account no, katakana)
     const err = partyError({ ...v, scope: 'Local' });
     if (err) return toast(err, 'error');
-    if (v.country !== company.country && !confirm(`Change home country to ${v.country}? Parties in ${v.country} become Local and all others International.`)) return;
+    if (isMain && v.country !== company.country && !confirm(`Change home country to ${v.country}? Parties in ${v.country} become Local and all others International.`)) return;
     setSaving(true);
     try {
-      setCompany(await api.updateCompany(v));
-      toast('Company profile saved');
+      const saved = isNew ? await api.createCompany(v) : await api.updateCompany(id, v);
+      setCompany(saved);
+      toast(isNew ? 'Company added' : 'Company profile saved');
+      if (isNew) onCreated(saved);
     } catch (err2) {
       toast(err2.message, 'error');
     }
     setSaving(false);
+  }
+
+  async function setActive(active) {
+    if (!active && !confirm(`Archive ${company.name}? It is hidden from the company switcher and new entries; its records and reports stay.`)) return;
+    try { setCompany(await api.updateCompany(id, { ...company, active: active ? 1 : 0 })); toast(active ? 'Company restored' : 'Company archived'); }
+    catch (e) { toast(e.message, 'error'); }
+  }
+
+  async function remove() {
+    if (!confirm(`Delete ${company.name}? It has no vehicles or account entries. This cannot be undone.`)) return;
+    try { await api.deleteCompany(id); await reloadCompanies(); toast('Company deleted'); onCreated({ id: mainCompany.id }); }
+    catch (e) { toast(e.message, 'error'); }
   }
 
   // The logo saves immediately, separately from the form
@@ -41,8 +78,8 @@ export default function CompanyPage() {
     try { setCompany(await fn()); toast(msg); } catch (e) { toast(e.message, 'error'); }
     setLogoBusy(false);
   };
-  const uploadLogo = file => logoAction(() => api.uploadLogo(file), 'Logo updated');
-  const removeLogo = () => confirm('Remove the company logo?') && logoAction(api.deleteLogo, 'Logo removed');
+  const uploadLogo = file => logoAction(() => api.uploadLogo(id, file), 'Logo updated');
+  const removeLogo = () => confirm('Remove the company logo?') && logoAction(() => api.deleteLogo(id), 'Logo removed');
 
   const p = { form, disabled: !editable };
   const bankLine = jp
@@ -51,12 +88,20 @@ export default function CompanyPage() {
 
   return (
     <form id="company-form" onSubmit={save}>
-      <PageHeader title="Company Profile" subtitle={jp ? '会社情報 · shown on invoices and across the app' : 'Shown on invoices and across the app'}
-        actions={editable && <Button variant="primary" type="submit" form="company-form" disabled={saving}>{saving ? 'Saving…' : 'Save Changes'}</Button>} />
+      <PageHeader title={isNew ? 'Add Company' : 'Company Profile'}
+        subtitle={isNew ? 'Another company you buy and sell under, with its own invoices, cash book and reports'
+          : `${isMain ? 'Main company' : 'Company'} · ${jp ? '会社情報 · shown on its invoices' : 'shown on its invoices and reports'}`}
+        actions={editable && <>
+          {/* No buying, selling or account entries → can be deleted; otherwise archive it to keep its records */}
+          {!isNew && !isMain && company.active === 0 && <Button onClick={() => setActive(true)}>Restore</Button>}
+          {!isNew && !isMain && company.active !== 0 && company.record_count > 0 && <Button onClick={() => setActive(false)}>Archive</Button>}
+          {!isNew && !isMain && !company.record_count && <Button variant="danger" onClick={remove}>Delete Company</Button>}
+          <Button variant="primary" type="submit" form="company-form" disabled={saving}>{saving ? 'Saving…' : isNew ? 'Add Company' : 'Save Changes'}</Button>
+        </>} />
 
       <div className="company-layout">
         <div>
-          <Panel title={jp ? 'Company Logo ロゴ' : 'Company Logo'}>
+          {!isNew && <Panel title={jp ? 'Company Logo ロゴ' : 'Company Logo'}>
             <div className="logo-editor">
               <div className="logo-box">
                 {company?.logo ? <img src={fileUrl(company.logo)} alt="Company logo" /> : <span className="muted">No logo</span>}
@@ -70,12 +115,12 @@ export default function CompanyPage() {
                 </div>}
               </div>
             </div>
-          </Panel>
+          </Panel>}
 
           <Panel title={jp ? 'Company 会社' : 'Business Details'}>
             <FormGrid>
               <Select {...p} name="country" label="Country *" options={COUNTRY_OPTIONS} creatable sortable placeholder={false}
-                hint="Decides what “Local” means for buyers and sellers" />
+                hint={isMain ? 'Decides what “Local” means for buyers and sellers' : undefined} />
               <Input {...p} name="name" label={jp ? 'Company Name 会社名 *' : 'Company Name *'} required placeholder={jp ? '株式会社オートインベントリー' : ''} />
               {jp && <Input {...p} name="name_kana" label="Reading フリガナ" placeholder="カブシキガイシャオートインベントリー" />}
               {jp && <Input {...p} name="name_en" label="English Name" placeholder="Auto Inventory Co., Ltd." hint="Printed on export invoices" />}
@@ -115,7 +160,7 @@ export default function CompanyPage() {
                 <Input {...p} name="corporate_number" label="Corporate No. 法人番号" placeholder="13 digits" inputMode="numeric" maxLength={13} />
                 <Input {...p} name="invoice_reg_no" label="Invoice Registration No. 登録番号" placeholder="T1234567890123"
                   hint="Required on qualified invoices (インボイス制度)" />
-                <Input {...p} name="antique_license" label="Antique Dealer Licence 古物商許可番号" placeholder="第123456789012号"
+                <Input {...p} name="antique_license" label="Antique Licence 古物商許可番号" placeholder="第123456789012号"
                   hint="Required to trade used vehicles" />
                 <Input {...p} name="antique_license_authority" label="Issued by 公安委員会" placeholder="東京都公安委員会" />
                 <TextArea {...p} name="auction_memberships" label="Auction Memberships 会員番号" rows={2} placeholder={'USS 12345\nTAA 67890'} />
@@ -143,7 +188,7 @@ export default function CompanyPage() {
             <FormGrid>
               <Select {...p} name="currency" label="Currency" options={CURRENCIES} creatable placeholder={false}
                 hint={company?.currency && v.currency !== company.currency ? 'Changing currency relabels existing amounts; it does not convert them.' : undefined} />
-              <Input {...p} name="invoice_prefix" label="Invoice Prefix" hint={`Next invoices: ${(v.invoice_prefix || 'INV').toUpperCase()}-${new Date().getFullYear()}-0001`} />
+              <Input {...p} name="invoice_prefix" label="Invoice Prefix" hint={`Each company needs its own prefix. Next invoices: ${(v.invoice_prefix || 'INV').toUpperCase()}-${new Date().getFullYear()}-0001`} />
               <TextArea {...p} name="terms" label="Terms & Conditions (one per line)" rows={5} />
             </FormGrid>
           </Panel>

@@ -70,6 +70,22 @@ Permissions are enforced by the API (`backend/lib/auth.js`), not just hidden in 
 
 All registration, phone and bank numbers in the demo use placeholder zeros.
 
+## Multiple companies
+
+**Settings → Companies** holds one profile per company you trade under, each with its own logo, bank details, currency and
+invoice prefix (prefixes must differ). Every vehicle and account entry belongs to one company. Company 1 is the main company:
+its country decides what "Local" means for parties. Parties are shared by all companies.
+
+With more than one company, the header shows a company switcher:
+
+- **A single company**: inventory, buying, selling, expenses, cash book, search and every report show only that company.
+- **All companies**: everything is combined, and the Dashboard, reports and Cash & Balances add a **By Company** table
+  (click a row to switch to that company). Lists get a Company column.
+
+New vehicles and entries go to the company being viewed; in the combined view you choose one. An expense linked to a vehicle
+is booked to the vehicle's company. A company with records can be archived, but not deleted.
+Existing data is assigned to company 1 automatically on first start.
+
 ## Features
 
 - **Vehicles**: specs (make, model, variant, year, chassis/VIN, engine, mileage, color, fuel, transmission, body, drive, steering…), purchase details and every cost (price, freight, duty, repair, other), status (In Transit / In Stock / Reserved / Sold), and sale details (Local / Export, buyer, country, port, price, expenses).

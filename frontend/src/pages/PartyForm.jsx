@@ -10,7 +10,7 @@ export default function PartyForm() {
   const { id } = useParams();
   const nav = useNavigate();
   const toast = useToast();
-  const { company } = useAuth();
+  const { mainCompany: company } = useAuth();
   const form = useForm(emptyParty('Buyer', company?.country));
   const [loading, setLoading] = useState(!!id);
   const [saving, setSaving] = useState(false);

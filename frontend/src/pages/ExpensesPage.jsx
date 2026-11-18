@@ -8,6 +8,7 @@ import { PageHeader, Panel, StatCard, DataTable, DateRangeFilter, BarList, Butto
 import TxnModal from '../components/TxnModal';
 import { useTxnActions } from './AccountsPage';
 import { t } from '../i18n';
+import { useEntryCompanyColumns } from '../components/CompanySwitcher';
 
 const sum = rows => rows.reduce((a, r) => a + (r.amount || 0), 0);
 
@@ -17,6 +18,7 @@ export default function ExpensesPage() {
   const { data, error, loading, reload } = useAsync(() => api.transactions({ kind: 'Expense', from: filter.from, to: filter.to }), [filter.from, filter.to]);
   const [adding, setAdding] = useState(false);
   const { column, editing, setEditing } = useTxnActions(reload);
+  const companyCols = useEntryCompanyColumns();
   const done = () => { setAdding(false); setEditing(null); reload(); };
 
   const all = data || [];
@@ -67,6 +69,7 @@ export default function ExpensesPage() {
           <DataTable rows={rows} exportName="expenses" filterable groupable pageSize={20} onPrint={() => window.print()}
             emptyText="No expenses in this period." columns={[
               { key: 'txn_date', label: 'Date', format: formatDate },
+              ...companyCols,
               { key: 'category', label: 'Category', groupable: true },
               { key: 'description', label: 'Description' },
               { key: 'account', label: 'Paid by', groupable: true },

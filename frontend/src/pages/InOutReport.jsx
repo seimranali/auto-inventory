@@ -9,6 +9,8 @@ import {
   Badge, SaleTypeBadge, vehicleColumns,
 } from '../components';
 import BarChart, { SplitBar } from '../components/BarChart';
+import CompanyBreakdown from '../components/CompanyBreakdown';
+import { useCompanyColumns } from '../components/CompanySwitcher';
 
 const monthName = m => `${MONTHS[Number(m.slice(5, 7)) - 1]} ${m.slice(2, 4)}`;
 const signedCount = n => <span className={n > 0 ? 'pos' : n < 0 ? 'neg' : ''}>{n > 0 ? `+${n}` : n}</span>;
@@ -18,6 +20,7 @@ export default function InOutReport() {
   const [range, setRange] = useState({ from: '', to: '' });
   const [tab, setTab] = useState('log');
   const { data, error, loading } = useAsync(() => api.report('inout', range), [range.from, range.to]);
+  const companyCols = useCompanyColumns();
   const open = v => nav(`/vehicles/${v.vehicle_id || v.id}`);
 
   // One chronological ledger of every IN (purchase) and OUT (sale) movement
@@ -61,6 +64,14 @@ export default function InOutReport() {
           <StatCard icon="cash" accent="amber" label="Net Cash Flow" value={money(s.out.value - s.in.value)} tone="auto" raw={s.out.value - s.in.value}
             hint="Sales received minus purchases (incl. costs)" />
         </div>
+
+        <CompanyBreakdown rows={data.byCompany} columns={[
+          { key: 'in_count', label: 'IN', align: 'right' },
+          { key: 'in_value', label: 'Bought For', align: 'right', format: money },
+          { key: 'out_count', label: 'OUT', align: 'right' },
+          { key: 'out_value', label: 'Sold For', align: 'right', format: money },
+          { key: 'cash', label: 'Net Cash Flow', align: 'right', value: r => (r.out_value || 0) - (r.in_value || 0), format: money },
+        ]} />
 
         <div className="dash-grid">
           <Panel title="Vehicles IN vs OUT by Month" actions={busiest && <span className="muted">Busiest: {busiest.label}</span>}>
@@ -126,13 +137,13 @@ export default function InOutReport() {
 
           {tab === 'in' && (
             <DataTable rows={data.inRows} exportName="vehicles-in" onRowClick={open} filterable groupable pageSize={20}
-              columns={vehicleColumns('photo', 'stock_no', 'vehicle', 'make', 'chassis_no', 'grade', 'purchase_date', 'purchase_source',
+              columns={vehicleColumns('photo', 'stock_no', ...companyCols, 'vehicle', 'make', 'chassis_no', 'grade', 'purchase_date', 'purchase_source',
                 'supplier', 'status', 'purchase_price', 'total_cost')} />
           )}
 
           {tab === 'out' && (
             <DataTable rows={data.outRows} exportName="vehicles-out" onRowClick={open} filterable groupable pageSize={20}
-              columns={vehicleColumns('photo', 'stock_no', 'vehicle', 'make', 'chassis_no', 'sale_date', 'sale_type', 'buyer_name',
+              columns={vehicleColumns('photo', 'stock_no', ...companyCols, 'vehicle', 'make', 'chassis_no', 'sale_date', 'sale_type', 'buyer_name',
                 'destination', 'days', 'total_cost', 'sale_price', 'profit')} />
           )}
         </div>

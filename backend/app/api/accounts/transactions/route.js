@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { db, json, fail } from '@/lib/db';
+import { db, json, fail, scopeOf, inScope } from '@/lib/db';
 import { guard } from '@/lib/auth';
 import { cleanTxn } from '@/lib/accounts';
 
@@ -8,7 +8,7 @@ export const runtime = 'nodejs';
 // GET ?kind=Expense&account=Cash&category=Fuel&from=&to=&q=
 export const GET = guard('accounts:manage', async req => {
   const p = new URL(req.url).searchParams;
-  const where = [], args = [];
+  const where = [inScope(scopeOf(req), 't.company_id')], args = [];
   for (const k of ['kind', 'account', 'category']) if (p.get(k)) { where.push(`t.${k} = ?`); args.push(p.get(k)); }
   if (p.get('from')) { where.push('t.txn_date >= ?'); args.push(p.get('from')); }
   if (p.get('to')) { where.push('t.txn_date <= ?'); args.push(p.get('to')); }
@@ -22,7 +22,7 @@ export const GET = guard('accounts:manage', async req => {
 });
 
 export const POST = guard('accounts:manage', async (req, _ctx, user) => {
-  const { data, error } = cleanTxn(await req.json());
+  const { data, error } = await cleanTxn(await req.json(), scopeOf(req));
   if (error) return fail(error);
   const id = crypto.randomUUID();
   const cols = Object.keys(data);

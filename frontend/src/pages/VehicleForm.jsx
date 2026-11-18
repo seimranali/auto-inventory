@@ -8,6 +8,7 @@ import * as C from '../constants';
 import { money, pct, margin, today } from '../format';
 import { PageHeader, Panel, FormGrid, Input, Select, DateField, TextArea, Field, Button, FileDropzone, Loader, useToast } from '../components';
 import PartyPicker from '../components/PartyPicker';
+import { useAuth } from '../auth';
 
 const n = v => Number(v) || 0;
 
@@ -34,7 +35,10 @@ export default function VehicleForm() {
   const { id } = useParams();
   const nav = useNavigate();
   const toast = useToast();
-  const form = useForm({ status: 'In Stock', condition: 'Used', purchase_date: today(), steering: 'Right' });
+  const { multiCompany, activeCompanies, scopedCompany, companyOf } = useAuth();
+  // New vehicles are bought for the company being viewed; with all companies in view the user picks one
+  const form = useForm({ status: 'In Stock', condition: 'Used', purchase_date: today(), steering: 'Right',
+    company_id: scopedCompany?.id ?? (activeCompanies.length === 1 ? activeCompanies[0].id : '') });
   const [loading, setLoading] = useState(!!id);
   const [saving, setSaving] = useState(false);
   const [pendingImages, setPendingImages] = useState([]);
@@ -80,6 +84,7 @@ export default function VehicleForm() {
 
   async function submit(e) {
     e.preventDefault();
+    if (multiCompany && !v.company_id) return toast('Choose which company is buying this vehicle', 'error');
     if (!v.make || !v.model) return toast('Make and Model are required', 'error');
     if (isSold && (!v.sale_date || !v.sale_price || !v.sale_type)) return toast('Sold vehicles need Sale Type, Sale Date and Sale Price', 'error');
     if (chassis.inStock && !isSold) return toast(`Chassis ${v.chassis_no} is already in stock as ${chassis.inStock.stock_no}`, 'error');
@@ -106,6 +111,18 @@ export default function VehicleForm() {
           <Button onClick={() => nav(-1)}>Cancel</Button>
           <Button variant="primary" type="submit" form="vehicle-form" disabled={saving}>{saving ? 'Saving…' : 'Save Vehicle'}</Button>
         </>} />
+
+      {multiCompany && (
+        <Panel title="Company">
+          <FormGrid>
+            <Select {...p} name="company_id" label="Bought by (company) *" placeholder={false} searchable={activeCompanies.length > 6}
+              value={v.company_id ? String(v.company_id) : ''}
+              options={[...new Map([...activeCompanies, ...(v.company_id ? [companyOf(v.company_id)] : [])].filter(Boolean)
+                .map(c => [String(c.id), { value: String(c.id), label: c.name, description: c.currency }])).values()]}
+              hint="Its stock, cash book, invoices and reports" />
+          </FormGrid>
+        </Panel>
+      )}
 
       <Panel title="Vehicle Information">
         <FormGrid>

@@ -19,5 +19,5 @@ logs/
 .wrangler/
 
 # Business data exported from the database (customers, prices, profit)
-reports/
+/reports/
 presentation-screenshots/

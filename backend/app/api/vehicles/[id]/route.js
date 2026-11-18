@@ -1,4 +1,4 @@
-import { db, assignInvoiceNo, cleanVehicle, getVehicle, removeUpload, json, fail, isUnique, col, NOW,
+import { db, resolveCompanyId, assignInvoiceNo, cleanVehicle, getVehicle, removeUpload, json, fail, isUnique, col, NOW,
   chassisKey, chassisStockError, chassisSaleError } from '@/lib/db';
 import { guard, can } from '@/lib/auth';
 
@@ -15,7 +15,7 @@ export const GET = guard('vehicles:read', async (_req, { params }) => {
 
 export const PUT = guard(null, async (req, { params }, user) => {
   const { id } = await params;
-  const current = await db.get('SELECT id, chassis_no, status, purchase_date FROM vehicles WHERE id = ?', id);
+  const current = await db.get('SELECT id, chassis_no, status, purchase_date, company_id FROM vehicles WHERE id = ?', id);
   if (!current) return fail('Vehicle not found', 404);
   try {
     const data = cleanVehicle(await req.json());
@@ -26,6 +26,7 @@ export const PUT = guard(null, async (req, { params }, user) => {
       if (data.status && data.status !== 'Sold') return fail('You can only record sales', 403);
     }
     if (data.chassis_no) data.chassis_no = String(data.chassis_no).trim();
+    if ('company_id' in data) data.company_id = await resolveCompanyId(data.company_id, current.company_id);
 
     // Chassis rules, checked against the vehicle as it will be after this change
     const after = { ...current, ...data };

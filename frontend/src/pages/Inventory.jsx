@@ -6,6 +6,7 @@ import { useAsync } from '../hooks';
 import { STATUSES, SALE_TYPES } from '../constants';
 import { money, vehicleTitle } from '../format';
 import { PageHeader, DataTable, Dropdown, Button, Loader, ErrorBox, vehicleColumns } from '../components';
+import { useCompanyColumns } from '../components/CompanySwitcher';
 
 const EMPTY = { q: '', status: '', make: '', sale_type: '' };
 
@@ -13,6 +14,7 @@ export default function Inventory() {
   const nav = useNavigate();
   const { can } = useAuth();
   const { data, error, loading } = useAsync(() => api.vehicles());
+  const companyCols = useCompanyColumns();
   const [params] = useSearchParams();
   const [f, setF] = useState({ ...EMPTY, q: params.get('q') || '' });
   // Header search navigates here with ?q=
@@ -71,7 +73,7 @@ export default function Inventory() {
           <DataTable rows={rows} exportName="inventory" onRowClick={v => nav(`/vehicles/${v.id}`)}
             filterable groupable pageSize={20}
             emptyText={dirty ? 'No vehicles match these filters.' : 'No vehicles yet. Click “+ Buying” to add one.'}
-            columns={vehicleColumns('photo', 'stock_no', 'vehicle', 'make', 'year', 'chassis_no', 'color', 'mileage', 'grade', 'status',
+            columns={vehicleColumns('photo', 'stock_no', ...companyCols, 'vehicle', 'make', 'year', 'chassis_no', 'color', 'mileage', 'grade', 'status',
               'purchase_date', 'purchase_source', 'total_cost', 'sale_type', 'sale_price', 'profit')} />
         </div>
       )}

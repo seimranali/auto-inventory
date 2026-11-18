@@ -9,6 +9,7 @@ import {
   StatusBadge, SaleTypeBadge, Thumb,
 } from '../components';
 import BarChart, { SplitBar } from '../components/BarChart';
+import CompanyBreakdown from '../components/CompanyBreakdown';
 
 const monthLabel = m => MONTHS[Number(m.slice(5, 7)) - 1];
 
@@ -52,6 +53,15 @@ export default function Dashboard() {
         <span className="chip"><span className="muted">OUT this month</span><b>{data.thisMonth.out}</b></span>
         <span className="chip"><span className="muted">Profit this month</span><b className={data.thisMonth.profit < 0 ? 'neg' : 'pos'}>{money(data.thisMonth.profit)}</b></span>
       </div>
+
+      <CompanyBreakdown rows={data.byCompany} columns={[
+        { key: 'stock_count', label: 'In Stock', align: 'right' },
+        { key: 'stock_value', label: 'Stock Value', align: 'right', format: money },
+        { key: 'sold_count', label: 'Sold', align: 'right' },
+        { key: 'revenue', label: 'Revenue', align: 'right', format: money },
+        { key: 'profit', label: 'Vehicle Profit', align: 'right', format: n => <span className={n < 0 ? 'neg' : 'pos'}>{money(n)}</span> },
+        { key: 'receivable', label: 'Pending Payments', align: 'right', format: money },
+      ]} />
 
       <div className="dash-grid">
         <Panel title="Vehicles IN vs OUT" actions={<span className="muted">Last 6 months</span>}>

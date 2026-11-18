@@ -8,6 +8,8 @@ import { PageHeader, Panel, StatCard, DataTable, BarList, Button, Badge, Loader,
 import TxnModal from '../components/TxnModal';
 import NavIcon from '../components/NavIcon';
 import { t } from '../i18n';
+import CompanyBreakdown from '../components/CompanyBreakdown';
+import { useEntryCompanyColumns } from '../components/CompanySwitcher';
 
 // Kind badge + signed amount, shared by the Accounts pages
 export const KIND_CLASS = { 'Cash In': 'b-InStock', 'Cash Out': 'b-Sold', Expense: 'b-Reserved', 'Card Payment': 'b-InTransit', 'Vehicle Sale': 'b-InStock', 'Vehicle Purchase': 'b-Sold' };
@@ -46,6 +48,7 @@ export default function AccountsPage() {
   const { data, error, loading, reload } = useAsync(() => api.accountsSummary());
   const [adding, setAdding] = useState(null);
   const { column, editing, setEditing } = useTxnActions(reload);
+  const companyCols = useEntryCompanyColumns();
   const done = () => { setAdding(null); setEditing(null); reload(); };
 
   const header = (
@@ -73,6 +76,16 @@ export default function AccountsPage() {
           hint={e.byCategory[0] ? `${money(e.byCategory[0].amount)} this month` : 'No expenses this month'} />
       </div>
 
+      <CompanyBreakdown rows={[...new Set([...Object.keys(data.byCompany.cash), ...Object.keys(data.byCompany.card),
+        ...e.byCompany.map(x => String(x.company_id))])].map(id => ({
+        company_id: id, cash: data.byCompany.cash[id] || 0, card: data.byCompany.card[id] || 0,
+        expenses: e.byCompany.find(x => String(x.company_id) === id)?.amount || 0,
+      }))} columns={[
+        { key: 'cash', label: 'Cash in Hand', align: 'right', format: n => <span className={n < 0 ? 'neg' : ''}>{money(n)}</span> },
+        { key: 'card', label: 'Card Balance (owed)', align: 'right', format: money },
+        { key: 'expenses', label: `Expenses · ${month}`, align: 'right', format: money },
+      ]} />
+
       <div className="dash-grid">
         <Panel title="Expenses by Category" actions={<span className="muted">{month}</span>}>
           {e.byCategory.length
@@ -98,6 +111,7 @@ export default function AccountsPage() {
       <Panel title="Recent Entries">
         <DataTable rows={data.recent} emptyText="No entries yet — add an expense or cash entry above." columns={[
           { key: 'txn_date', label: 'Date', format: formatDate },
+          ...companyCols,
           { key: 'kind', label: 'Type', render: r => <KindBadge kind={r.kind} />, value: r => r.kind },
           { key: 'account', label: 'Account' },
           { key: 'category', label: 'Category' },

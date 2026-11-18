@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { api, fileUrl } from '../api';
 import { useAsync } from '../hooks';
 import { useAuth } from '../auth';
-import { money, vehicleTitle, getCurrency, formatAddress, JP_ACCOUNT_LABEL } from '../format';
+import { moneyIn, vehicleTitle, getCurrency, formatAddress, JP_ACCOUNT_LABEL } from '../format';
 import { formatDate } from '../dates';
 import { Button, Loader, ErrorBox } from '../components';
 
@@ -65,8 +65,9 @@ export default function InvoicePage() {
   const COMPANY = { ...company, terms: (company?.terms || '').split('\n').filter(Boolean) };
   const CURRENCY = getCurrency();
   const jpCo = company?.country === 'Japan';
-  if (loading || !company) return <Loader />;
+  if (loading) return <Loader />;
   if (error) return <ErrorBox error={error} />;
+  if (!company) return <Loader />;
   if (v.status !== 'Sold') return <ErrorBox error="This vehicle has not been sold yet." />;
 
   const balance = (v.sale_price || 0) - (v.amount_received || 0);

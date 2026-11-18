@@ -8,6 +8,7 @@ import Button from './Button';
 import { Input, Select, DateField, TextArea, FormGrid } from './FormFields';
 import { useToast } from './Toast';
 import { t } from '../i18n';
+import { useAuth } from '../auth';
 
 // What each kind of entry does, shown under the form
 const KIND_HELP = {
@@ -25,7 +26,9 @@ const loadVehicles = q => api.vehicles({ q }).then(rows => rows.slice(0, 50).map
 /** Add or edit a cash / expense / card-payment entry. kind fixes the type for new entries; txn edits an existing one. */
 export default function TxnModal({ kind, txn, categories = [], onClose, onSaved }) {
   const toast = useToast();
-  const form = useForm(txn ? { ...txn } : { kind, txn_date: today(), account: 'Cash' });
+  const { multiCompany, activeCompanies, scopedCompany } = useAuth();
+  const form = useForm(txn ? { ...txn, company_id: String(txn.company_id ?? '') }
+    : { kind, txn_date: today(), account: 'Cash', company_id: scopedCompany ? String(scopedCompany.id) : '' });
   const [saving, setSaving] = useState(false);
   const v = form.values;
   const isExpense = v.kind === 'Expense';
@@ -34,6 +37,7 @@ export default function TxnModal({ kind, txn, categories = [], onClose, onSaved 
   async function save(e) {
     e.preventDefault();
     e.stopPropagation();
+    if (multiCompany && !v.company_id && !v.vehicle_id) return toast('Choose a company', 'error');
     setSaving(true);
     try {
       const saved = txn ? await api.updateTransaction(txn.id, v) : await api.createTransaction(v);
@@ -50,6 +54,9 @@ export default function TxnModal({ kind, txn, categories = [], onClose, onSaved 
       footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" type="submit" form="txn-form" disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button></>}>
       <form id="txn-form" onSubmit={save}>
         <FormGrid>
+          {multiCompany && <Select form={form} name="company_id" label="Company *" placeholder={false} searchable={false}
+            options={activeCompanies.map(c => ({ value: String(c.id), label: c.name }))}
+            hint={isExpense ? 'An expense linked to a vehicle goes to the company that owns it' : undefined} />}
           <DateField form={form} name="txn_date" label="Date *" max={today()} clearable={false} />
           <Input form={form} name="amount" label="Amount *" type="number" min="0" step="any" required autoFocus />
           {isExpense && <Select form={form} name="account" label="Paid by *" options={EXPENSE_ACCOUNTS} placeholder={false} searchable={false} />}

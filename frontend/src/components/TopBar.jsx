@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import NavIcon from './NavIcon';
 import GlobalSearch from './GlobalSearch';
+import CompanySwitcher from './CompanySwitcher';
 import { useAuth } from '../auth';
 import { t, LangSwitch, getLang } from '../i18n';
 
@@ -31,6 +32,7 @@ export default function TopBar({ collapsed, onToggle }) {
       </button>
       <GlobalSearch />
       <div className="topbar-right">
+        <CompanySwitcher />
         <LangSwitch />
         <span className="topbar-date">{date}</span>
         <div className="user-menu" ref={menuRef}>
@@ -47,7 +49,7 @@ export default function TopBar({ collapsed, onToggle }) {
                 {company && <small className="muted">{company.name}</small>}
               </div>
               <Link role="menuitem" to="/profile" onClick={() => setMenu(false)}><NavIcon name="user" size={16} /> {t('My Profile')}</Link>
-              {can('company:manage') && <Link role="menuitem" to="/settings/company" onClick={() => setMenu(false)}><NavIcon name="company" size={16} /> {t('Company')}</Link>}
+              {can('company:manage') && <Link role="menuitem" to="/settings/company" onClick={() => setMenu(false)}><NavIcon name="company" size={16} /> {t('Companies')}</Link>}
               {can('users:manage') && <Link role="menuitem" to="/settings/users" onClick={() => setMenu(false)}><NavIcon name="users" size={16} /> {t('Users')}</Link>}
               <button type="button" role="menuitem" className="danger" onClick={logout}><NavIcon name="logout" size={16} /> {t('Sign out')}</button>
             </div>

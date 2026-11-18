@@ -15,7 +15,7 @@ export const NAV = [
   { to: '/reports/profit', label: 'Profit & Margin', icon: 'profit', perm: 'reports:read', keywords: 'profit margin report revenue' },
   { to: '/reports/in-out', label: 'IN / OUT Vehicles', icon: 'inout', perm: 'reports:read', keywords: 'movement purchases sales report' },
   { head: 'Settings' },
-  { to: '/settings/company', label: 'Company', icon: 'company', perm: 'company:manage', keywords: 'settings profile invoice bank' },
+  { to: '/settings/company', label: 'Companies', icon: 'company', perm: 'company:manage', keywords: 'company companies settings profile invoice bank multi' },
   { to: '/settings/users', label: 'Users', icon: 'users', perm: 'users:manage', keywords: 'staff accounts login' },
   { to: '/settings/roles', label: 'User Roles', icon: 'shield', perm: 'users:manage', keywords: 'permissions access' },
 ];

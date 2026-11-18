@@ -9,7 +9,7 @@ export function Field({ label, wide, children, hint }) {
   // A div, not a <label>, so clicks inside a Dropdown panel don't retrigger its button
   return (
     <div className={`field ${wide ? 'wide' : ''}`}>
-      {t(label)}
+      {label && <span className="field-label" title={typeof label === 'string' ? t(label) : undefined}>{t(label)}</span>}
       {children}
       {hint && <span className="field-hint">{t(hint)}</span>}
     </div>

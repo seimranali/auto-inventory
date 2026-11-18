@@ -1,5 +1,10 @@
+// Company being viewed: a company id, or null for all companies combined. Sent with every request.
+let companyScope = null;
+export const setCompanyScope = id => { companyScope = id || null; };
+
 async function request(path, options = {}) {
-  const res = await fetch(`/api${path}`, { credentials: 'same-origin', ...options });
+  const headers = { ...options.headers, ...(companyScope ? { 'X-Company': String(companyScope) } : {}) };
+  const res = await fetch(`/api${path}`, { credentials: 'same-origin', ...options, headers });
   const data = await res.json().catch(() => ({}));
   // Session expired or revoked: tell the app to show the login page
   if (res.status === 401 && !path.startsWith('/auth/')) window.dispatchEvent(new Event('auth:expired'));
@@ -58,10 +63,12 @@ export const api = {
   deleteTransaction: id => request(`/accounts/transactions/${id}`, { method: 'DELETE' }),
   ledger: params => request(`/accounts/ledger${qs(params)}`),
 
-  company: () => request('/company'),
-  updateCompany: data => send('PUT', '/company', data),
-  uploadLogo: file => upload('/company/logo', 'file', file),
-  deleteLogo: () => request('/company/logo', { method: 'DELETE' }),
+  companies: () => request('/companies'),
+  createCompany: data => send('POST', '/companies', data),
+  updateCompany: (id, data) => send('PUT', `/companies/${id}`, data),
+  deleteCompany: id => request(`/companies/${id}`, { method: 'DELETE' }),
+  uploadLogo: (id, file) => upload(`/companies/${id}/logo`, 'file', file),
+  deleteLogo: id => request(`/companies/${id}/logo`, { method: 'DELETE' }),
 };
 
 // Ready-made loadOptions for <Dropdown>: existing values of a vehicle field, with vehicle counts

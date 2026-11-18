@@ -1,12 +1,12 @@
 import crypto from 'crypto';
-import { db, assignInvoiceNo, nextStockNo, chassisStockError, chassisSaleError, SELECT_VEHICLE, cleanVehicle, getVehicle, json, fail, isUnique, col } from '@/lib/db';
+import { db, scopeOf, inScope, resolveCompanyId, assignInvoiceNo, nextStockNo, chassisStockError, chassisSaleError, SELECT_VEHICLE, cleanVehicle, getVehicle, json, fail, isUnique, col } from '@/lib/db';
 import { guard } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
 export const GET = guard('vehicles:read', async req => {
   const p = new URL(req.url).searchParams;
-  const where = [];
+  const where = [inScope(scopeOf(req), 'v.company_id')];
   const args = [];
   if (p.get('status')) { where.push('status = ?'); args.push(p.get('status')); }
   if (p.get('q')) {
@@ -21,6 +21,7 @@ export const POST = guard('vehicles:write', async req => {
   try {
     const data = cleanVehicle(await req.json());
     data.status ||= 'In Stock';
+    data.company_id = await resolveCompanyId(data.company_id, scopeOf(req));
     if (data.chassis_no) data.chassis_no = String(data.chassis_no).trim();
     const id = crypto.randomUUID();
     // One vehicle in stock per chassis; a sold chassis may be bought again

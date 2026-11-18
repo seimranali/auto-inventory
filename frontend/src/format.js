@@ -8,6 +8,8 @@ export const setCurrency = c => { currency = c || CURRENCY; };
 export const getCurrency = () => currency;
 
 export const money = n => (n == null || n === '' ? '-' : `${currency} ${moneyFmt.format(Number(n))}`);
+// In a given currency (e.g. on an invoice of a company that trades in another currency)
+export const moneyIn = (n, cur) => (n == null || n === '' ? '-' : `${cur || currency} ${moneyFmt.format(Number(n))}`);
 // Short form for chart axes and tight spaces: 6455000 -> "6.5M"
 export const compact = n => {
   const a = Math.abs(n), s = n < 0 ? '-' : '';

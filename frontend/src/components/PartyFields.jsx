@@ -50,7 +50,7 @@ export function Segmented({ value, options, onChange }) {
  * registration, 古物商 licence, auction membership and Japanese bank (branch code, 普通/当座) fields.
  */
 export default function PartyFields({ form, compact = false }) {
-  const { company } = useAuth();
+  const { mainCompany: company } = useAuth();
   const home = company?.country || 'Pakistan';
   const v = form.values;
   const intl = v.scope === 'International';
@@ -103,7 +103,7 @@ export default function PartyFields({ form, compact = false }) {
           <FormGrid>
             <Input {...p} name="invoice_reg_no" label="Invoice Registration No. 登録番号" placeholder="T1234567890123"
               hint="Qualified Invoice System (インボイス制度)" />
-            {trader && <Input {...p} name="antique_license" label="Antique Dealer Licence 古物商許可番号" placeholder="第123456789012号" />}
+            {trader && <Input {...p} name="antique_license" label="Antique Licence 古物商許可番号" placeholder="第123456789012号" />}
             {trader && <Input {...p} name="antique_license_authority" label="Issued by 公安委員会" placeholder="Tokyo Metropolitan Public Safety Commission" />}
             {trader && <Input {...p} name="auction_member_no" label="Auction Member No. 会員番号" placeholder="e.g. USS 12345" />}
             {isCompany && <Select {...p} name="id_type" label="Other ID (individual rep.)" options={JP_ID_TYPES.filter(t => !t.startsWith('Corporate'))} searchable={false} />}
@@ -190,7 +190,7 @@ export default function PartyFields({ form, compact = false }) {
 // Quick-add from the Sell / Buying forms; returns the created party via onCreated
 export function PartyQuickAdd({ role, initialName = '', onClose, onCreated }) {
   const toast = useToast();
-  const { company } = useAuth();
+  const { mainCompany: company } = useAuth();
   const form = useForm({ ...emptyParty(role, company?.country), name: initialName });
   const [saving, setSaving] = useState(false);
   async function save(e) {

@@ -172,7 +172,7 @@ export default function VehicleDetail() {
   const { data: v, error, loading, setData } = useAsync(() => api.vehicle(id), [id]);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState('overview');
-  const { can, company } = useAuth();
+  const { can, companyOf, multiCompany } = useAuth();
   const canEdit = can('vehicles:write'), canSell = can('sales:write');
 
   if (loading) return <Loader />;
@@ -223,6 +223,7 @@ export default function VehicleDetail() {
           <span>Chassis <b>{v.chassis_no || '-'}</b></span>
           {v.reg_no && <span>Reg <b>{v.reg_no}</b></span>}
           {v.location && <span>{v.location}</span>}
+          {multiCompany && <span>Company <b>{v.company_label || companyOf(v.company_id)?.name}</b></span>}
         </span>}
         actions={<>
           <Button to="/inventory" title="Back to Inventory">← Inventory</Button>
@@ -234,7 +235,7 @@ export default function VehicleDetail() {
           {canEdit && <Button variant="danger" onClick={remove} aria-label="Delete vehicle">Delete</Button>}
         </>} />
 
-      <PurchaseRecord v={v} company={company} costs={costs} />
+      <PurchaseRecord v={v} company={companyOf(v.company_id)} costs={costs} />
 
       <div className="vd-layout">
         {/* ---------- Main column ---------- */}

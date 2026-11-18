@@ -8,6 +8,7 @@ export const agingBucket = d => (d == null ? 'Unknown' : d <= 30 ? AGING_BUCKETS
 
 // Shared DataTable column definitions for vehicles; pick by key in each page/report
 const defs = {
+  company: { key: 'company', label: 'Company', value: v => v.company_label, groupable: true },
   photo: { key: 'photo', label: '', render: v => <Thumb name={v.cover} />, value: () => '', filter: false },
   stock_no: { key: 'stock_no', label: 'Stock #', render: v => <Link to={`/vehicles/${v.id}`} onClick={e => e.stopPropagation()}>{v.stock_no || '(none)'}</Link>, value: v => v.stock_no },
   vehicle: { key: 'vehicle', label: 'Vehicle', value: vehicleTitle },

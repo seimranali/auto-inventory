@@ -8,6 +8,7 @@ import { PageHeader, StatCard, DataTable, DateRangeFilter, Button, Loader, Error
 import TxnModal from '../components/TxnModal';
 import { KindBadge, useTxnActions } from './AccountsPage';
 import { t } from '../i18n';
+import { useEntryCompanyColumns } from '../components/CompanySwitcher';
 
 const BOOKS = [
   { id: 'Cash', label: 'Cash Ledger', balance: 'Cash Balance', inLabel: 'Received', outLabel: 'Paid' },
@@ -27,6 +28,7 @@ export default function LedgerPage() {
     [book.id, range.from, range.to, vehicles]);
   const [adding, setAdding] = useState(null);
   const { column, editing, setEditing } = useTxnActions(reload);
+  const companyCols = useEntryCompanyColumns();
   const done = () => { setAdding(null); setEditing(null); reload(); };
   const exp = book.id === 'Expenses';
   const period = `${range.from ? formatDate(range.from) : 'From start'} → ${range.to ? formatDate(range.to) : 'today'}`;
@@ -74,6 +76,7 @@ export default function LedgerPage() {
             onPrint={() => window.print()} onRowClick={r => r.vehicle_id && nav(`/vehicles/${r.vehicle_id}`)}
             emptyText="No entries in this period." columns={[
               { key: 'date', label: 'Date', format: formatDate },
+              ...companyCols,
               { key: 'kind', label: 'Type', render: r => <KindBadge kind={r.kind} />, value: r => r.kind, groupable: true },
               ...(book.id === 'Cash' ? [] : [{ key: 'account', label: 'Paid by', groupable: exp }]),
               { key: 'category', label: 'Category', groupable: true },

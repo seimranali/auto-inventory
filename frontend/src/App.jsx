@@ -57,7 +57,7 @@ function Forbidden() {
 }
 
 export default function App() {
-  const { user, loading, can, company } = useAuth();
+  const { user, loading, can, company, scope } = useAuth();
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [headerSlot, setHeaderSlot] = useState(null);
   const isMobile = useMediaQuery(MOBILE_QUERY);
@@ -109,7 +109,8 @@ export default function App() {
         <div ref={setHeaderSlot} className="page-header-slot" />
         <div className="main-scroll">
         <HeaderSlotContext.Provider value={headerSlot}>
-        <Routes>
+        {/* Switching company remounts the page so it reloads for the new scope */}
+        <Routes key={scope}>
           <Route path="/" element={<Navigate to={home} replace />} />
           <Route path="/dashboard" element={guarded('reports:read', <Dashboard />)} />
           <Route path="/inventory" element={guarded('vehicles:read', <Inventory />)} />

@@ -32,6 +32,8 @@ export const VEHICLE_FIELDS = [
   // Links to the parties table (the text fields above keep a snapshot for invoices)
   ['seller_party_id', 'NVARCHAR(64)'], ['buyer_party_id', 'NVARCHAR(64)'],
   ['notes', 'NVARCHAR(MAX)'],
+  // Which of our companies bought / owns / sells the vehicle (company.id)
+  ['company_id', 'INT'],
 ];
 const FIELD_NAMES = VEHICLE_FIELDS.map(f => f[0]);
 const NUMERIC = new Set(VEHICLE_FIELDS.filter(f => f[1] === 'INT' || f[1] === 'FLOAT').map(f => f[0]));
@@ -194,10 +196,14 @@ async function initSchema(p) {
     vehicle_id NVARCHAR(64) NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
     file_name NVARCHAR(200) NOT NULL, sort INT DEFAULT 0, created_at NVARCHAR(30) DEFAULT ${NOW}`);
 
-  await table('company', `id INT PRIMARY KEY CHECK (id = 1), updated_at NVARCHAR(30),
+  await table('company', `id INT PRIMARY KEY, updated_at NVARCHAR(30),
     ${COMPANY_FIELDS.map(f => `[${f}] ${f === 'terms' || f === 'address' ? 'NVARCHAR(MAX)' : 'NVARCHAR(400)'}`).join(', ')}`);
   await addMissing('company', [...COMPANY_FIELDS.map(f => [f, f === 'terms' || f === 'address' ? 'NVARCHAR(MAX)' : 'NVARCHAR(400)']),
-    ['logo', 'NVARCHAR(200)']]); // uploaded file name; set only through /api/company/logo
+    ['logo', 'NVARCHAR(200)'], // uploaded file name; set only through /api/companies/:id/logo
+    ['active', 'INT'], ['created_at', 'NVARCHAR(30)']]);
+  // Multi-company: the table used to hold one row (CHECK id = 1). Drop that check; company 1 stays the main company.
+  await q(`DECLARE @c sysname = (SELECT TOP 1 name FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID('company'));
+    IF @c IS NOT NULL EXEC('ALTER TABLE company DROP CONSTRAINT [' + @c + ']')`);
   await table('users', `id NVARCHAR(64) PRIMARY KEY, name NVARCHAR(200) NOT NULL, email NVARCHAR(256) NOT NULL UNIQUE, phone NVARCHAR(100),
     password_hash NVARCHAR(400) NOT NULL, role NVARCHAR(30) NOT NULL, active INT DEFAULT 1,
     last_login NVARCHAR(30), created_at NVARCHAR(30) DEFAULT ${NOW}, updated_at NVARCHAR(30)`);
@@ -214,9 +220,12 @@ async function initSchema(p) {
     account NVARCHAR(30) NOT NULL, category NVARCHAR(100), description NVARCHAR(400), amount FLOAT NOT NULL,
     reference NVARCHAR(100), vehicle_id NVARCHAR(64), created_by NVARCHAR(64), created_at NVARCHAR(30) DEFAULT ${NOW}, updated_at NVARCHAR(30)`);
   await index('ix_transactions_date', 'CREATE INDEX ix_transactions_date ON transactions(txn_date, kind)');
+  await addMissing('transactions', [['company_id', 'INT']]);
 
   await index('ix_vehicles_buyer', 'CREATE INDEX ix_vehicles_buyer ON vehicles(buyer_party_id)');
   await index('ix_vehicles_seller', 'CREATE INDEX ix_vehicles_seller ON vehicles(seller_party_id)');
+  await index('ix_vehicles_company', 'CREATE INDEX ix_vehicles_company ON vehicles(company_id, status)');
+  await index('ix_transactions_company', 'CREATE INDEX ix_transactions_company ON transactions(company_id, txn_date)');
 
   if (!(await q('SELECT TOP 1 1 x FROM company')).recordset.length) {
     const r = p.request();
@@ -227,6 +236,10 @@ async function initSchema(p) {
       VALUES (1, 'Auto Inventory Motors', 'Import · Local Sale · Export', 'Showroom address, City, Country', '+92 300 0000000',
       'sales@example.com', 'Pakistan', 'PKR', 'INV', @terms)`);
   }
+  // Rows from before multi-company belong to the main company
+  await q('UPDATE company SET active = 1 WHERE active IS NULL');
+  await q('UPDATE vehicles SET company_id = (SELECT MIN(id) FROM company) WHERE company_id IS NULL');
+  await q('UPDATE transactions SET company_id = (SELECT MIN(id) FROM company) WHERE company_id IS NULL');
   // First run: create a default admin so someone can log in
   if (!(await q('SELECT TOP 1 1 x FROM users')).recordset.length) {
     const { hashPassword } = await import('./password.js');
@@ -244,6 +257,7 @@ export const PROFIT_SQL = `(ISNULL(sale_price,0)-${COST_SQL}-ISNULL(sale_expense
 // selectVehicles(8) → "SELECT TOP 8 …"; append WHERE / ORDER BY
 export const selectVehicles = top => `SELECT ${top ? `TOP ${Number(top)} ` : ''}v.*, ${COST_SQL} AS total_cost,
   CASE WHEN status='Sold' THEN ${PROFIT_SQL} END AS profit,
+  (SELECT name FROM company c WHERE c.id = v.company_id) AS company_label,
   (SELECT TOP 1 file_name FROM vehicle_images i WHERE i.vehicle_id=v.id ORDER BY sort, created_at) AS cover
   FROM vehicles v`;
 export const SELECT_VEHICLE = selectVehicles();
@@ -293,10 +307,11 @@ export async function nextStockNo(date) {
 
 // Sold vehicles get the next invoice number for the sale year: INV-2026-0001
 export async function assignInvoiceNo(id) {
-  const v = await db.get('SELECT status, invoice_no, sale_date FROM vehicles WHERE id=?', id);
+  const v = await db.get('SELECT status, invoice_no, sale_date, company_id FROM vehicles WHERE id=?', id);
   if (!v || v.status !== 'Sold' || v.invoice_no) return;
   const year = (v.sale_date || new Date().toISOString()).slice(0, 4);
-  const base = (await db.get('SELECT invoice_prefix FROM company WHERE id = 1'))?.invoice_prefix || 'INV';
+  // Each company numbers invoices with its own prefix
+  const base = (await db.get('SELECT invoice_prefix FROM company WHERE id = ?', v.company_id || 1))?.invoice_prefix || 'INV';
   const prefix = `${base}-${year}-`;
   const { n } = await db.get(`SELECT MAX(TRY_CAST(SUBSTRING(invoice_no, ${prefix.length + 1}, 20) AS INT)) n FROM vehicles WHERE invoice_no LIKE ?`, `${prefix}%`);
   await db.run('UPDATE vehicles SET invoice_no=? WHERE id=?', prefix + String((n || 0) + 1).padStart(4, '0'), id);
@@ -343,6 +358,27 @@ export function removeUpload(name) {
   if (!name) return;
   const file = path.join(UPLOAD_DIR, path.basename(name));
   if (fs.existsSync(file)) fs.unlinkSync(file);
+}
+
+// ---- Company scope ----
+// The app sends the company being viewed in the X-Company header: a company id, or "all" / nothing for every company combined.
+export function scopeOf(req) {
+  const n = Number(req.headers.get('x-company'));
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+// SQL condition limiting rows to the scope (the id is a validated integer, safe to inline)
+export const inScope = (cid, column = 'company_id') => (cid ? `${column} = ${Number(cid)}` : '1=1');
+
+// Company for a new vehicle / entry: the one chosen, else the one being viewed, else the only active one
+export async function resolveCompanyId(value, scope) {
+  let id = Number(value) || scope;
+  if (!id) {
+    const active = await db.all('SELECT id FROM company WHERE ISNULL(active, 1) = 1');
+    if (active.length === 1) id = active[0].id;
+  }
+  if (!id) throw new Error('Choose a company');
+  if (!await db.get('SELECT 1 x FROM company WHERE id = ?', id)) throw new Error('Company not found');
+  return id;
 }
 
 export const json = (data, status = 200) => Response.json(data, { status });
